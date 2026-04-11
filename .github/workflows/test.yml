@@ -16,21 +16,17 @@ jobs:
     defaults:
       run:
         working-directory: experiments/gemma4_e2b_cpu
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Verify litert_lm import and CPU backend
         run: |
           python -c "
@@ -38,15 +34,13 @@ jobs:
           assert hasattr(litert_lm, 'Engine'), 'Engine missing'
           assert hasattr(litert_lm.Backend, 'CPU'), 'CPU backend missing'
           assert hasattr(litert_lm, 'LogSeverity'), 'LogSeverity missing'
-          print('litert_lm import OK — Engine, Backend.CPU, LogSeverity all present')
+          print('litert_lm import OK')
           "
-
       - name: Download Gemma 4 E2B model from HuggingFace
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python download_model.py
-
       - name: Run CPU inference smoke test
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -54,20 +48,18 @@ jobs:
           python run_inference_cpu.py \
             --prompt "Explain what LiteRT-LM is in one sentence." \
             --max-tokens 64
-
       - name: Run benchmark (5 prompts)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python benchmark.py --runs 1
-
       - name: Lint with ruff
         continue-on-error: true
         run: |
           pip install ruff
           ruff check .
 
-  # ── Job 2: ONNX Runtime GenAI / Gemma 4 E2B / CPU ───────────────────────
+  # ── Job 2: ONNX Runtime / Gemma 4 E2B / CPU ─────────────────────────────
   onnx-genai-cpu:
     name: ONNX Runtime GenAI — Gemma 4 E2B CPU
     runs-on: ubuntu-latest
@@ -75,39 +67,30 @@ jobs:
     defaults:
       run:
         working-directory: experiments/gemma4_e2b_onnx
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Verify onnxruntime_genai import
+      - name: Verify onnxruntime import
         run: |
           python -c "
-          import onnxruntime_genai as og
-          print('onnxruntime_genai imported successfully')
-          print('Version:', og.__version__)
-          assert hasattr(og, 'Model'), 'Model class missing'
-          assert hasattr(og, 'Generator'), 'Generator class missing'
-          assert hasattr(og, 'Tokenizer'), 'Tokenizer class missing'
-          print('All checks passed — Model, Generator, Tokenizer present')
+          import onnxruntime as ort
+          print('onnxruntime version:', ort.__version__)
+          assert 'CPUExecutionProvider' in ort.get_available_providers()
+          print('CPUExecutionProvider OK')
           "
-
       - name: Download Gemma 4 E2B ONNX model from HuggingFace
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python download_model.py
-
       - name: Run CPU inference smoke test
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -115,13 +98,11 @@ jobs:
           python run_inference_cpu.py \
             --prompt "Explain what ONNX Runtime GenAI is in one sentence." \
             --max-tokens 64
-
       - name: Run benchmark (5 prompts)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python benchmark.py --runs 1
-
       - name: Lint with ruff
         continue-on-error: true
         run: |
