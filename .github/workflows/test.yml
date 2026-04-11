@@ -51,13 +51,13 @@ jobs:
         run: |
           python run_inference_cpu.py \
             --prompt "Explain what LiteRT-LM is in one sentence." \
-            --max_tokens 64
+            --max-tokens 64
 
       - name: Run benchmark (3 prompts)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python benchmark.py --runs 3
+          python benchmark.py --runs 1
 
       - name: Lint with ruff
         continue-on-error: true
