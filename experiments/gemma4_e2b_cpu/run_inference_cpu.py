@@ -1,11 +1,14 @@
 """Single-turn inference with Gemma 4 E2B via LiteRT-LM on CPU.
 
-Usage:
-    python run_inference_cpu.py --prompt "Your prompt here"
-    python run_inference_cpu.py --prompt "Explain transformers" --max-tokens 256
+Uses the official LiteRT-LM Python API:
+  Engine -> create_conversation() -> send_message / send_message_async
 
-Docs:
-    https://ai.google.dev/edge/litert-lm/python
+Docs:  https://ai.google.dev/edge/litert-lm/python
+Model: litert-community/gemma-4-E2B-it-litert-lm
+
+Usage:
+    python run_inference_cpu.py
+    python run_inference_cpu.py --prompt "Explain transformers" --max-tokens 256
 """
 
 import argparse
@@ -16,98 +19,86 @@ import litert_lm
 
 DEFAULT_MODEL_PATH = Path("./models/gemma-4-E2B-it-litert-lm.litertlm")
 DEFAULT_MAX_TOKENS = 512
-CPU_NUM_THREADS = 4  # XNNPACK thread count — tune to your core count
+SYSTEM_PROMPT = "You are a helpful AI assistant running on-device via LiteRT-LM."
 
 
-def build_prompt(user_text: str) -> str:
-    """Wrap user text in Gemma instruct chat template."""
-    return (
-        "<start_of_turn>user\n"
-        f"{user_text}\n"
-        "<end_of_turn>\n"
-        "<start_of_turn>model\n"
-    )
-
-
-def run_inference(
-    model_path: Path,
-    prompt: str,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
-) -> dict:
+def run_inference(model_path: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS) -> dict:
     """
-    Run a single inference pass on CPU using LiteRT-LM.
-
-    Returns a dict with the response and latency metrics.
+    Run a single streaming inference pass on CPU using LiteRT-LM.
+    Returns a dict with the response text and latency metrics.
     """
     if not model_path.exists():
         raise FileNotFoundError(
-            f"Model not found at {model_path}.\n"
+            f"Model not found at: {model_path}\n"
             "Run download_model.py first."
         )
 
-    print(f"Loading model from: {model_path}")
-    print(f"Backend: CPU (XNNPACK, {CPU_NUM_THREADS} threads)")
+    # Suppress verbose internal logs
+    litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
+
+    print(f"Loading model : {model_path}")
+    print(f"Backend       : CPU (XNNPACK)")
     print("-" * 60)
 
-    # Initialise LiteRT-LM engine on CPU
-    engine = litert_lm.Engine(
-        model_path=str(model_path),
+    messages = [
+        {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT}]},
+    ]
+
+    load_start = time.perf_counter()
+
+    with litert_lm.Engine(
+        str(model_path),
         backend=litert_lm.Backend.CPU,
-        num_threads=CPU_NUM_THREADS,
-    )
+        cache_dir="/tmp/planckify-litert-cache",
+    ) as engine:
+        load_latency = time.perf_counter() - load_start
+        print(f"Model loaded in {load_latency:.2f}s")
+        print(f"Prompt: {prompt}")
+        print("-" * 60)
+        print("Response:")
 
-    formatted_prompt = build_prompt(prompt)
+        with engine.create_conversation(messages=messages) as conversation:
+            response_chunks: list[str] = []
+            first_chunk_time: float | None = None
+            infer_start = time.perf_counter()
 
-    # Prefill phase
-    prefill_start = time.perf_counter()
-    session = engine.create_session()
-    session.add_query_chunk(formatted_prompt)
-    prefill_end = time.perf_counter()
+            # Streaming decode via send_message_async
+            for chunk in conversation.send_message_async(prompt):
+                for item in chunk.get("content", []):
+                    if item.get("type") == "text":
+                        text = item["text"]
+                        print(text, end="", flush=True)
+                        response_chunks.append(text)
+                        if first_chunk_time is None:
+                            first_chunk_time = time.perf_counter()
 
-    prefill_tokens = len(formatted_prompt.split())  # approximate
-    prefill_latency = prefill_end - prefill_start
-    ttft = prefill_latency  # time-to-first-token
+            infer_end = time.perf_counter()
 
-    print(f"Prompt: {prompt}")
-    print("-" * 60)
-    print("Response:")
-
-    # Decode phase — stream tokens
-    response_tokens = []
-    decode_start = time.perf_counter()
-
-    for token in session.generate(max_new_tokens=max_tokens):
-        print(token, end="", flush=True)
-        response_tokens.append(token)
-        if len(response_tokens) == 1:
-            ttft = time.perf_counter() - prefill_start
-
-    decode_end = time.perf_counter()
     print("\n" + "-" * 60)
 
-    decode_latency = decode_end - decode_start
-    n_decoded = len(response_tokens)
-    decode_tps = n_decoded / decode_latency if decode_latency > 0 else 0
-    prefill_tps = prefill_tokens / prefill_latency if prefill_latency > 0 else 0
+    full_response = "".join(response_chunks)
+    total_latency = infer_end - infer_start
+    ttft = (first_chunk_time - infer_start) if first_chunk_time else total_latency
+    # Approximate token count (word-level proxy)
+    approx_tokens = len(full_response.split())
+    decode_tps = approx_tokens / total_latency if total_latency > 0 else 0
 
     metrics = {
         "prompt": prompt,
-        "response": "".join(response_tokens),
-        "prefill_tokens": prefill_tokens,
-        "prefill_latency_s": round(prefill_latency, 3),
-        "prefill_tps": round(prefill_tps, 1),
-        "decode_tokens": n_decoded,
-        "decode_latency_s": round(decode_latency, 3),
-        "decode_tps": round(decode_tps, 1),
+        "response": full_response,
+        "model_load_latency_s": round(load_latency, 2),
         "ttft_s": round(ttft, 3),
+        "total_latency_s": round(total_latency, 2),
+        "approx_tokens_generated": approx_tokens,
+        "approx_decode_tps": round(decode_tps, 1),
     }
 
     print("\n[Metrics]")
+    print(f"  Model load time   : {metrics['model_load_latency_s']}s")
     print(f"  TTFT              : {metrics['ttft_s']}s")
-    print(f"  Prefill speed     : {metrics['prefill_tps']} tokens/sec")
-    print(f"  Decode speed      : {metrics['decode_tps']} tokens/sec")
-    print(f"  Tokens generated  : {metrics['decode_tokens']}")
-    print(f"  Total decode time : {metrics['decode_latency_s']}s")
+    print(f"  Total decode time : {metrics['total_latency_s']}s")
+    print(f"  Approx tokens out : {metrics['approx_tokens_generated']}")
+    print(f"  Approx decode TPS : {metrics['approx_decode_tps']} tokens/sec")
 
     return metrics
 
@@ -120,24 +111,16 @@ if __name__ == "__main__":
         "--prompt",
         type=str,
         default="Explain quantization in neural networks in simple terms.",
-        help="Input prompt",
     )
     parser.add_argument(
         "--model-path",
         type=Path,
         default=DEFAULT_MODEL_PATH,
-        help=f"Path to .litertlm model file (default: {DEFAULT_MODEL_PATH})",
     )
     parser.add_argument(
         "--max-tokens",
         type=int,
         default=DEFAULT_MAX_TOKENS,
-        help=f"Max tokens to generate (default: {DEFAULT_MAX_TOKENS})",
     )
     args = parser.parse_args()
-
-    run_inference(
-        model_path=args.model_path,
-        prompt=args.prompt,
-        max_tokens=args.max_tokens,
-    )
+    run_inference(model_path=args.model_path, prompt=args.prompt, max_tokens=args.max_tokens)

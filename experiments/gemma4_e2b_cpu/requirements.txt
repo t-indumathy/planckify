@@ -1,5 +1,6 @@
-# LiteRT-LM runtime — Google's on-device LLM inference engine
-litert-lm>=0.2.0
+# LiteRT-LM Python API (nightly) — Google's on-device LLM inference engine
+# Docs: https://ai.google.dev/edge/litert-lm/python
+litert-lm-api-nightly
 
 # HuggingFace Hub for model download
 huggingface-hub>=0.22.0

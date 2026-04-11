@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -27,16 +27,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify litert-lm import
+      - name: Verify litert_lm import and CPU backend
         run: |
           python -c "
           import litert_lm
-          print('litert_lm version:', litert_lm.__version__)
-          print('Available backends:', [b.name for b in litert_lm.Backend])
-          print('CPU backend present:', hasattr(litert_lm.Backend, 'CPU'))
+          print('litert_lm imported successfully')
+          print('Backend.CPU available:', hasattr(litert_lm.Backend, 'CPU'))
+          print('Engine class present:', hasattr(litert_lm, 'Engine'))
+          print('LogSeverity present:', hasattr(litert_lm, 'LogSeverity'))
+          assert hasattr(litert_lm.Backend, 'CPU'), 'CPU backend missing'
+          assert hasattr(litert_lm, 'Engine'), 'Engine class missing'
+          print('All checks passed.')
           "
 
-      - name: Lint with ruff (optional)
+      - name: Lint with ruff
         continue-on-error: true
         run: |
           pip install ruff
