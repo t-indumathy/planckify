@@ -13,6 +13,8 @@ build/
 .venv/
 venv/
 env/
+.wsl-venv/
+*.log
 
 # HuggingFace cache
 .cache/

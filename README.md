@@ -166,6 +166,20 @@ python benchmark.py --runs 1
 
 > **Note:** ONNX raw runs a full dual-session KV-cache decode loop with no GenAI-level fusion. The 5.4 tok/s on a 2-vCPU runner is the baseline floor — native AVX-512 hardware or a GPU EP will be significantly faster. LiteRT-LM's XNNPACK kernel is highly optimised for this workload, hence the ~2.7× throughput advantage on the same runner.
 
+## Local Machine Baselines (x86-64)
+
+> Measured locally on Intel i7-9750H (12 vCPU, 2.60GHz) · ORT pinned to 4 threads · 5 prompts · 64 max tokens each
+
+| Metric | LiteRT-LM (int4) | ONNX Runtime raw (q4) |
+|---|---|---|
+| Decode speed avg | 8.2 tok/s | 6.1 tok/s |
+| Decode speed min/max | 6.9 / 9.0 tok/s | 5.9 / 6.4 tok/s |
+| TTFT / latency avg | 0.994 s | 10.53 s |
+| TTFT / latency min/max | 0.693 / 1.998 s | 10.04 / 10.80 s |
+| Peak RAM | ~3.5 GB | ~3.5 GB |
+
+> **Note:** LiteRT-LM retains a ~1.3× TPS advantage and ~10× TTFT advantage over raw ONNX Runtime on the same hardware.
+
 ## Requirements
 
 - Python 3.10+
