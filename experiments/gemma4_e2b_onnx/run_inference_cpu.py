@@ -4,8 +4,8 @@ Uses AutoTokenizer (text-only, no vision/audio processor) to avoid
 TorchVision/PyTorch dependency chain.
 
 Two ONNX sessions:
-  1. embed_tokens_q4.onnx        - input_ids -> inputs_embeds + per_layer_inputs
-  2. decoder_model_merged_q4.onnx - autoregressive decode with KV cache
+    1. embed_tokens_q4.onnx        - input_ids -> inputs_embeds + per_layer_inputs
+    2. decoder_model_merged_q4.onnx - autoregressive decode with KV cache
 
 Usage:
     python run_inference_cpu.py
@@ -27,7 +27,9 @@ def build_session(model_path: Path) -> ort.InferenceSession:
     opts = ort.SessionOptions()
     opts.inter_op_num_threads = 4
     opts.intra_op_num_threads = 4
-    return ort.InferenceSession(str(model_path), sess_options=opts, providers=["CPUExecutionProvider"])
+    return ort.InferenceSession(
+        str(model_path), sess_options=opts, providers=["CPUExecutionProvider"]
+    )
 
 
 def _init_kv_cache(decoder_sess: ort.InferenceSession) -> dict:
@@ -55,6 +57,25 @@ def _init_kv_cache(decoder_sess: ort.InferenceSession) -> dict:
     return past_kv
 
 
+def _num_logits_to_keep(decoder_sess: ort.InferenceSession) -> np.ndarray:
+    """Return num_logits_to_keep in the shape the model expects.
+
+    Older ONNX exports (opset <= 18) map this input directly to a Slice
+    'starts' slot, which requires a 1-D tensor.  Newer exports treat it as
+    a scalar.  We inspect the declared shape from the session schema and
+    return the matching NumPy array so ORT never sees a shape mismatch.
+    """
+    for inp in decoder_sess.get_inputs():
+        if inp.name == "num_logits_to_keep":
+            declared = inp.shape  # e.g. [] or [1] or [None]
+            if declared:  # non-empty -> at least 1-D
+                return np.array([1], dtype=np.int64)
+            else:  # scalar slot
+                return np.array(1, dtype=np.int64)
+    # Not in schema at all - return 1-D as safe default
+    return np.array([1], dtype=np.int64)
+
+
 def run_inference(
     model_dir: Path,
     prompt: str,
@@ -62,19 +83,19 @@ def run_inference(
 ) -> dict:
     """Run text inference using embed_tokens + decoder ONNX sessions with KV cache."""
     if not model_dir.exists():
-        raise FileNotFoundError(f"Model not found at: {model_dir}\nRun download_model.py first.")
+        raise FileNotFoundError(
+            f"Model not found at: {model_dir}\nRun download_model.py first."
+        )
 
     print(f"Loading model : {model_dir}")
     print("Backend       : CPU (raw ONNX Runtime, text-only)")
     print("-" * 60)
 
     load_start = time.perf_counter()
-
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
 
     embed_path = model_dir / "onnx" / "embed_tokens_q4.onnx"
     decoder_path = model_dir / "onnx" / "decoder_model_merged_q4.onnx"
-
     if not embed_path.exists() or not decoder_path.exists():
         raise FileNotFoundError(
             f"ONNX files not found under {model_dir}/onnx/.\n"
@@ -86,7 +107,9 @@ def run_inference(
     load_time = time.perf_counter() - load_start
 
     messages = [{"role": "user", "content": prompt}]
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    text = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
     inputs = tokenizer(text, return_tensors="np")
     input_ids = inputs["input_ids"].astype(np.int64)
 
@@ -101,12 +124,14 @@ def run_inference(
     decoder_output_names = [out.name for out in decoder_sess.get_outputs()]
 
     seq_len = input_ids.shape[1]
+    nlk = _num_logits_to_keep(decoder_sess)
+
     prefill_feed: dict = {
         "inputs_embeds": inputs_embeds,
         "attention_mask": np.ones((1, seq_len), dtype=np.int64),
         "position_ids": np.arange(seq_len, dtype=np.int64).reshape(1, -1),
         "use_cache_branch": np.array([False], dtype=bool),
-        "num_logits_to_keep": np.array([1], dtype=np.int64),
+        "num_logits_to_keep": nlk,
     }
     prefill_feed.update(past_kv)
     prefill_feed.update(per_layer_inputs)
@@ -122,7 +147,6 @@ def run_inference(
                 past_kv[pkey] = val
 
     next_token = int(np.argmax(prefill_map["logits"][0, -1, :]))
-
     gen_start = time.perf_counter()
     generated_ids = [next_token]
     total_seq = seq_len + 1
@@ -135,18 +159,22 @@ def run_inference(
         tok_embed_outs = embed_sess.run(None, {"input_ids": tok_ids})
         tok_embed_map = dict(zip(embed_names, tok_embed_outs))
         step_embeds = tok_embed_map["inputs_embeds"]
-        step_per_layer = {k: v for k, v in tok_embed_map.items() if k != "inputs_embeds"}
+        step_per_layer = {
+            k: v for k, v in tok_embed_map.items() if k != "inputs_embeds"
+        }
 
         decode_feed: dict = {
             "inputs_embeds": step_embeds,
             "attention_mask": np.ones((1, total_seq), dtype=np.int64),
             "position_ids": np.array([[total_seq - 1]], dtype=np.int64),
             "use_cache_branch": np.array([True], dtype=bool),
-            "num_logits_to_keep": np.array([1], dtype=np.int64),
+            "num_logits_to_keep": nlk,
         }
         decode_feed.update(past_kv)
         decode_feed.update(step_per_layer)
-        decode_feed = {k: v for k, v in decode_feed.items() if k in decoder_input_names}
+        decode_feed = {
+            k: v for k, v in decode_feed.items() if k in decoder_input_names
+        }
 
         decode_outs = decoder_sess.run(None, decode_feed)
         decode_map = dict(zip(decoder_output_names, decode_outs))
@@ -188,9 +216,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Gemma 4 E2B ONNX CPU inference")
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--prompt", type=str, default="What is the Planck constant?")
-    parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
+    parser.add_argument(
+        "--max-tokens", type=int, default=DEFAULT_MAX_TOKENS
+    )
     args = parser.parse_args()
-
     result = run_inference(args.model_dir, args.prompt, args.max_tokens)
     print(f"\nResult JSON: {result}")
 
