@@ -1,6 +1,6 @@
 # planckify
 
-> On-device LLM inference experiments using [Google LiteRT-LM](https://ai.google.dev/edge/litert-lm/overview) and [ONNX Runtime GenAI](https://onnxruntime.ai/docs/genai/) — quantized down to the smallest meaningful unit.
+> On-device LLM inference experiments using [Google LiteRT-LM](https://ai.google.dev/edge/litert-lm/overview) and [raw ONNX Runtime](https://onnxruntime.ai/) — quantized down to the smallest meaningful unit.
 
 ## Overview
 
@@ -11,13 +11,13 @@
 | Experiment | Framework | Model | Quantization | Backend | Status |
 |---|---|---|---|---|---|
 | `gemma4_e2b_cpu` | LiteRT-LM | Gemma 4 E2B it | int4 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
-| `gemma4_e2b_onnx` | ONNX Runtime GenAI | Gemma 4 E2B it | q4 (decoder_model_merged_q4.onnx) | CPU (ORT) | 🟢 Active |
+| `gemma4_e2b_onnx` | ONNX Runtime (raw) | Gemma 4 E2B it | q4 (`decoder_model_merged_q4.onnx`) | CPU (ORT) | 🟢 Active |
 
 ## Quantization: int4 (LiteRT-LM) vs q4 (ONNX)
 
 Both experiments run **4-bit quantized decoder weights** — the naming difference is purely a framework convention, not a difference in precision:
 
-| Property | LiteRT-LM (`int4`) | ONNX Runtime GenAI (`q4`) |
+| Property | LiteRT-LM (`int4`) | ONNX Runtime (`q4`) |
 |---|---|---|
 | Weight bit-width | 4-bit integer | 4-bit integer |
 | What's quantized | Decoder weights (0.79 GB) | Decoder weights |
@@ -26,7 +26,7 @@ Both experiments run **4-bit quantized decoder weights** — the naming differen
 | Runtime control | None — baked into `.litertlm` at export | Chosen via model file selection |
 | Comparable to | `q4_K` in llama.cpp | `q4_K_M` in llama.cpp |
 
-> **Benchmark implication:** TPS and TTFT numbers from both experiments are directly comparable — same model, same bit-width, same CPU hardware (Ubuntu x86-64 runner). Any difference in throughput reflects **framework overhead**, not quantization level.
+> **Benchmark implication:** TPS and latency numbers from both experiments are directly comparable — same model, same bit-width, same CPU hardware (Ubuntu x86-64 runner). Any difference in throughput reflects **framework overhead**, not quantization level.
 
 ## Repo Structure
 
@@ -37,77 +37,87 @@ planckify/
 │   │   ├── requirements.txt
 │   │   ├── download_model.py    # Pulls gemma-4-E2B-it.litertlm from HF
 │   │   ├── run_inference_cpu.py # Engine -> create_conversation -> send_message_async
-│   │   └── benchmark.py        # 5-prompt benchmark, min/avg/max stats
-│   └── gemma4_e2b_onnx/         # ONNX Runtime GenAI experiment
+│   │   └── benchmark.py         # 5-prompt benchmark, min/avg/max stats
+│   └── gemma4_e2b_onnx/         # Raw ONNX Runtime experiment
 │       ├── requirements.txt
 │       ├── download_model.py    # Pulls decoder_model_merged_q4.onnx from HF
-│       ├── run_inference_cpu.py # og.Model -> og.Generator streaming decode
-│       └── benchmark.py        # 5-prompt benchmark, min/avg/max stats
+│       ├── run_inference_cpu.py # Two ORT sessions: embed_tokens + decoder (KV cache)
+│       └── benchmark.py         # 5-prompt benchmark, min/avg/max stats
 ├── .github/
 │   └── workflows/
-│       └── test.yml             # Parallel CI: litert-lm-cpu + onnx-genai-cpu
+│       └── test.yml             # Parallel CI: litert-lm-cpu + onnx-raw-cpu
 └── .gitignore
 ```
 
 ## Quickstart — LiteRT-LM
 
 ### 1. Install dependencies
+
 ```bash
 cd experiments/gemma4_e2b_cpu
 pip install -r requirements.txt
 ```
 
 ### 2. Download the model
+
 ```bash
 export HF_TOKEN=your_token
 python download_model.py
 ```
+
 Pulls `litert-community/gemma-4-E2B-it-litert-lm` (~2.58 GB, int4).
 
 ### 3. Run inference
+
 ```bash
 python run_inference_cpu.py --prompt "Explain quantization in neural networks"
 ```
 
 ### 4. Run benchmark
+
 ```bash
 python benchmark.py --runs 1
 ```
 
-## Quickstart — ONNX Runtime GenAI
+## Quickstart — ONNX Runtime (raw)
 
 ### 1. Install dependencies
+
 ```bash
 cd experiments/gemma4_e2b_onnx
 pip install -r requirements.txt
 ```
 
 ### 2. Download the model
+
 ```bash
 export HF_TOKEN=your_token
 python download_model.py
 ```
-Pulls `onnx-community/gemma-4-E2B-it-ONNX` q4 decoder + embedder files.
+
+Pulls `onnx-community/gemma-4-E2B-it-ONNX` — `embed_tokens_q4.onnx` + `decoder_model_merged_q4.onnx`.
 
 ### 3. Run inference
+
 ```bash
 python run_inference_cpu.py --prompt "Explain quantization in neural networks"
 ```
 
 ### 4. Run benchmark
+
 ```bash
 python benchmark.py --runs 1
 ```
 
-## Expected CPU Baselines (Linux x86-64)
+## Expected CPU Baselines (Linux x86-64, GitHub Actions runner)
 
-| Metric | LiteRT-LM (int4) | ONNX Runtime GenAI (q4) |
+| Metric | LiteRT-LM (int4) | ONNX Runtime raw (q4) |
 |---|---|---|
-| Decode speed | ~35 tokens/sec | TBD |
-| TTFT | ~4 seconds | TBD |
-| Peak RAM | ~3.5 GB | TBD |
+| Decode speed | ~35 tok/s | ~4 tok/s |
+| Latency (64 tokens) | ~4 s | ~30 s |
+| Peak RAM | ~3.5 GB | ~3.5 GB |
 
-> ONNX baselines will be updated after CI benchmark runs complete.
+> **Note:** The ONNX raw path runs the full dual-session KV-cache decode loop without any GenAI-level optimisation (no beam search fusing, no CUDA EP). The ~4 tok/s on a 2-vCPU runner is the floor; native hardware with AVX-512 or a dedicated ORT build will be significantly faster.
 
 ## Requirements
 
@@ -123,6 +133,6 @@ python benchmark.py --runs 1
 - [LiteRT-LM Overview](https://ai.google.dev/edge/litert-lm/overview)
 - [gemma-4-E2B-it-litert-lm on HuggingFace](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)
 - [onnx-community/gemma-4-E2B-it-ONNX on HuggingFace](https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX)
-- [ONNX Runtime GenAI Python API](https://onnxruntime.ai/docs/genai/api/python.html)
+- [ONNX Runtime Python API](https://onnxruntime.ai/docs/api/python/api_summary.html)
 - [LiteRT-LM GitHub](https://github.com/google-ai-edge/LiteRT-LM)
-- [ONNX Runtime GenAI GitHub](https://github.com/microsoft/onnxruntime-genai)
+- [ONNX Runtime GitHub](https://github.com/microsoft/onnxruntime)
