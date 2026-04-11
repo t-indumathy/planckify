@@ -3,7 +3,7 @@
 Uses the official LiteRT-LM Python API:
   Engine -> create_conversation() -> send_message_async
 
-Docs:  https://ai.google.dev/edge/litert-lm/python
+Docs: https://ai.google.dev/edge/litert-lm/python
 
 Usage:
     python benchmark.py
@@ -36,8 +36,8 @@ def run_benchmark(model_path: Path, runs: int = 1) -> None:
 
     litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
 
-    print(f"Model   : {model_path}")
-    print(f"Backend : CPU (XNNPACK)")
+    print(f"Model : {model_path}")
+    print("Backend : CPU (XNNPACK)")
     print(f"Prompts : {len(BENCHMARK_PROMPTS)} | Runs per prompt: {runs}")
     print("=" * 70)
 
@@ -71,24 +71,22 @@ def run_benchmark(model_path: Path, runs: int = 1) -> None:
                                     first_chunk_time = time.perf_counter()
 
                     end = time.perf_counter()
-
-                total = end - start
-                ttft = (first_chunk_time - start) if first_chunk_time else total
-                response = "".join(chunks)
-                approx_tokens = len(response.split())
-                tps = approx_tokens / total if total > 0 else 0
-
-                prompt_ttfts.append(ttft)
-                prompt_tps.append(tps)
-                print(f"  Run {run+1}: TTFT={ttft:.3f}s  TPS={tps:.1f}  tokens~={approx_tokens}")
+                    total = end - start
+                    ttft = (first_chunk_time - start) if first_chunk_time else total
+                    response = "".join(chunks)
+                    approx_tokens = len(response.split())
+                    tps = approx_tokens / total if total > 0 else 0
+                    prompt_ttfts.append(ttft)
+                    prompt_tps.append(tps)
+                    print(f"  Run {run+1}: TTFT={ttft:.3f}s TPS={tps:.1f} tokens~={approx_tokens}")
 
             all_ttft.extend(prompt_ttfts)
             all_tps.extend(prompt_tps)
 
     print("\n" + "=" * 70)
     print("[Overall Benchmark Summary]")
-    print(f"  TTFT  avg={statistics.mean(all_ttft):.3f}s  min={min(all_ttft):.3f}s  max={max(all_ttft):.3f}s")
-    print(f"  TPS   avg={statistics.mean(all_tps):.1f}  min={min(all_tps):.1f}  max={max(all_tps):.1f}")
+    print(f"  TTFT avg={statistics.mean(all_ttft):.3f}s min={min(all_ttft):.3f}s max={max(all_ttft):.3f}s")
+    print(f"  TPS  avg={statistics.mean(all_tps):.1f} min={min(all_tps):.1f} max={max(all_tps):.1f}")
 
 
 if __name__ == "__main__":
