@@ -1,122 +1,143 @@
-"""Single-turn inference with Gemma 4 E2B via raw ONNX Runtime on CPU.
+"""Single-turn text inference with Gemma 4 E2B via raw ONNX Runtime on CPU.
 
-Uses onnxruntime (raw sessions) + transformers tokenizer:
-  ort.InferenceSession -> tokenizer.encode -> greedy decode loop
+Follows the official ONNX Runtime Python example from the model card:
+  https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX
 
-Docs:  https://onnxruntime.ai/docs/
-Model: onnx-community/gemma-4-E2B-it-ONNX (q4 quantized)
+Uses two ONNX sessions (text-only, no vision/audio):
+  1. embed_tokens_q4.onnx  - input_ids -> inputs_embeds + per_layer_inputs
+  2. decoder_model_merged_q4.onnx - autoregressive decode with KV cache
 
 Usage:
     python run_inference_cpu.py
-    python run_inference_cpu.py --prompt "Explain transformers" --max-tokens 256
+    python run_inference_cpu.py --prompt "Explain transformers" --max-tokens 64
 """
 import argparse
+import os
 import time
 from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
-from transformers import AutoTokenizer
+from transformers import AutoConfig, AutoProcessor, GenerationConfig
 
 DEFAULT_MODEL_DIR = Path("./models/gemma-4-E2B-it-ONNX")
-DEFAULT_MAX_TOKENS = 512
-SYSTEM_PROMPT = "You are a helpful AI assistant running on-device via ONNX Runtime."
+DEFAULT_MAX_TOKENS = 64
 
 
 def run_inference(model_dir: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS) -> dict:
-    """
-    Run a single greedy inference pass on CPU using raw onnxruntime sessions.
-    Returns a dict with the response text and latency metrics.
-    """
+    """Run text inference using embed_tokens + decoder ONNX sessions with KV cache."""
     if not model_dir.exists():
-        raise FileNotFoundError(
-            f"Model not found at: {model_dir}\n"
-            "Run download_model.py first."
-        )
+        raise FileNotFoundError(f"Model not found at: {model_dir}\nRun download_model.py first.")
 
     print(f"Loading model : {model_dir}")
-    print(f"Backend       : CPU (raw ONNX Runtime)")
+    print(f"Backend       : CPU (raw ONNX Runtime, text-only)")
     print("-" * 60)
 
     load_start = time.perf_counter()
 
-    # Load tokenizer from the model directory
-    tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
+    processor = AutoProcessor.from_pretrained(str(model_dir))
+    config = AutoConfig.from_pretrained(str(model_dir))
+    generation_config = GenerationConfig.from_pretrained(str(model_dir))
 
-    # Locate the ONNX model file
-    onnx_files = list(model_dir.rglob("*.onnx"))
-    if not onnx_files:
-        raise FileNotFoundError(f"No .onnx files found under {model_dir}")
-    onnx_path = onnx_files[0]
-    print(f"ONNX model    : {onnx_path}")
+    providers = ["CPUExecutionProvider"]
+    embed_path = model_dir / "onnx" / "embed_tokens_q4.onnx"
+    decoder_path = model_dir / "onnx" / "decoder_model_merged_q4.onnx"
 
-    sess_options = ort.SessionOptions()
-    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    session = ort.InferenceSession(
-        str(onnx_path),
-        sess_options=sess_options,
-        providers=["CPUExecutionProvider"],
-    )
+    if not embed_path.exists():
+        raise FileNotFoundError(f"embed_tokens_q4.onnx not found at {embed_path}")
+    if not decoder_path.exists():
+        raise FileNotFoundError(f"decoder_model_merged_q4.onnx not found at {decoder_path}")
+
+    embed_session = ort.InferenceSession(str(embed_path), providers=providers)
+    decoder_session = ort.InferenceSession(str(decoder_path), providers=providers)
 
     load_latency = time.perf_counter() - load_start
     print(f"Model loaded in {load_latency:.2f}s")
 
-    # Build chat prompt using Gemma instruct template
-    chat_template = (
-        f"<start_of_turn>user\n{SYSTEM_PROMPT}\n\n{prompt}<end_of_turn>\n"
-        "<start_of_turn>model\n"
+    # Build text-only chat prompt
+    messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+    inputs = processor.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        return_tensors="np",
     )
 
-    input_ids = tokenizer.encode(chat_template, return_tensors="np").astype(np.int64)
+    input_ids = inputs["input_ids"].astype(np.int64)
+    attention_mask = inputs["attention_mask"].astype(np.int64)
+    position_ids = (np.cumsum(attention_mask, axis=-1) - 1).astype(np.int64)
+
+    # Initialize KV cache (past_key_values)
+    past_key_values = {
+        inp.name: np.zeros(
+            [1, inp.shape[1], 0, inp.shape[3]],
+            dtype=np.float32 if inp.type == "tensor(float)" else np.float16,
+        )
+        for inp in decoder_session.get_inputs()
+        if inp.name.startswith("past_key_values")
+    }
+    num_logits_to_keep = np.array(1, dtype=np.int64)
+    eos_token_id = generation_config.eos_token_id
+    if isinstance(eos_token_id, list):
+        eos_token_ids = set(eos_token_id)
+    else:
+        eos_token_ids = {eos_token_id}
 
     print(f"Prompt: {prompt}")
     print("-" * 60)
     print("Response:")
 
-    response_tokens: list[int] = []
-    first_token_time: float | None = None
+    generated_tokens = []
+    first_token_time = None
     infer_start = time.perf_counter()
 
-    # Greedy decode loop
-    generated = input_ids.copy()
     for _ in range(max_tokens):
-        inputs = {"input_ids": generated}
-        # Some ONNX Gemma exports also need attention_mask
-        attention_mask = np.ones_like(generated, dtype=np.int64)
-        inputs["attention_mask"] = attention_mask
+        # Step 1: embed input_ids
+        inputs_embeds, per_layer_inputs = embed_session.run(None, {"input_ids": input_ids})
 
-        try:
-            outputs = session.run(None, inputs)
-        except Exception:
-            # Try without attention_mask if the model doesn't accept it
-            outputs = session.run(None, {"input_ids": generated})
+        # Step 2: run decoder with KV cache
+        decoder_inputs = dict(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            per_layer_inputs=per_layer_inputs,
+            position_ids=position_ids,
+            num_logits_to_keep=num_logits_to_keep,
+            **past_key_values,
+        )
+        decoder_outputs = decoder_session.run(None, decoder_inputs)
+        logits = decoder_outputs[0]
+        present_key_values = decoder_outputs[1:]
 
-        logits = outputs[0]  # shape: [batch, seq_len, vocab_size]
-        next_token_id = int(np.argmax(logits[0, -1, :]))
+        # Greedy token selection
+        next_token_id = int(np.argmax(logits[:, -1, :]))
 
         if first_token_time is None:
             first_token_time = time.perf_counter()
 
-        response_tokens.append(next_token_id)
-        token_text = tokenizer.decode([next_token_id], skip_special_tokens=True)
+        generated_tokens.append(next_token_id)
+        token_text = processor.decode([next_token_id], skip_special_tokens=True)
         print(token_text, end="", flush=True)
 
-        # Stop on EOS
-        if next_token_id == tokenizer.eos_token_id:
+        if next_token_id in eos_token_ids:
             break
 
-        generated = np.concatenate(
-            [generated, np.array([[next_token_id]], dtype=np.int64)], axis=1
+        # Update KV cache and position
+        input_ids = np.array([[next_token_id]], dtype=np.int64)
+        attention_mask = np.concatenate(
+            [attention_mask, np.ones((1, 1), dtype=np.int64)], axis=-1
         )
+        position_ids = np.array([[position_ids[0, -1] + 1]], dtype=np.int64)
+        for j, key in enumerate(past_key_values):
+            past_key_values[key] = present_key_values[j]
 
     infer_end = time.perf_counter()
     print("\n" + "-" * 60)
 
-    full_response = tokenizer.decode(response_tokens, skip_special_tokens=True)
+    full_response = processor.decode(generated_tokens, skip_special_tokens=True)
     total_latency = infer_end - infer_start
     ttft = (first_token_time - infer_start) if first_token_time else total_latency
-    tokens_generated = len(response_tokens)
-    decode_tps = tokens_generated / total_latency if total_latency > 0 else 0
+    decode_tps = len(generated_tokens) / total_latency if total_latency > 0 else 0
 
     metrics = {
         "prompt": prompt,
@@ -124,7 +145,7 @@ def run_inference(model_dir: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TO
         "model_load_latency_s": round(load_latency, 2),
         "ttft_s": round(ttft, 3),
         "total_latency_s": round(total_latency, 2),
-        "tokens_generated": tokens_generated,
+        "tokens_generated": len(generated_tokens),
         "decode_tps": round(decode_tps, 1),
     }
     print("\n[Metrics]")
@@ -138,7 +159,7 @@ def run_inference(model_dir: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TO
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run Gemma 4 E2B inference on CPU via raw ONNX Runtime"
+        description="Run Gemma 4 E2B text inference on CPU via raw ONNX Runtime"
     )
     parser.add_argument(
         "--prompt",
