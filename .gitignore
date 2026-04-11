@@ -1,0 +1,37 @@
+# Model files
+*.litertlm
+*.task
+cache/
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# HuggingFace cache
+.cache/
+~/.cache/huggingface/
+
+# Environment
+.env
+.env.local
+
+# Benchmark outputs
+benchmark_results/
+*.json
+*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp

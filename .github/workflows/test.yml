@@ -1,0 +1,43 @@
+name: Smoke Test — Gemma 4 E2B CPU
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/gemma4_e2b_cpu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify litert-lm import
+        run: |
+          python -c "
+          import litert_lm
+          print('litert_lm version:', litert_lm.__version__)
+          print('Available backends:', [b.name for b in litert_lm.Backend])
+          print('CPU backend present:', hasattr(litert_lm.Backend, 'CPU'))
+          "
+
+      - name: Lint with ruff (optional)
+        continue-on-error: true
+        run: |
+          pip install ruff
+          ruff check .

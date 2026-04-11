@@ -1,0 +1,9 @@
+# LiteRT-LM runtime — Google's on-device LLM inference engine
+litert-lm>=0.2.0
+
+# HuggingFace Hub for model download
+huggingface-hub>=0.22.0
+
+# Utilities
+numpy>=1.26.0
+tqdm>=4.66.0
