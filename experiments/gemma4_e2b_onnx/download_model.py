@@ -13,18 +13,22 @@ from huggingface_hub import snapshot_download, login
 REPO_ID = "onnx-community/gemma-4-E2B-it-ONNX"
 DEFAULT_MODEL_DIR = Path("./models/gemma-4-E2B-it-ONNX")
 
-# Pull only q4 CPU files + all required config/tokenizer files.
-# genai_config.json is required at model root by onnxruntime-genai.
-ALLOW_PATTERNS = [
-    "genai_config.json",
-    "tokenizer.json",
-    "tokenizer_config.json",
-    "special_tokens_map.json",
-    "tokenizer.model",
-    "onnx/decoder_model_merged_q4.onnx",
-    "onnx/decoder_model_merged_q4.onnx.data",
-    "onnx/embed_tokens_q4.onnx",
-    "onnx/embed_tokens_q4.onnx.data",
+# Ignore large files we don't need for text-only CPU inference:
+# - vision/audio encoders
+# - non-q4 precision variants (fp16, fp32, int8, uint8)
+# - web task files
+IGNORE_PATTERNS = [
+    "onnx/vision_encoder*",
+    "onnx/audio_encoder*",
+    "onnx/*_fp16*",
+    "onnx/*_fp32*",
+    "onnx/*_int8*",
+    "onnx/*_uint8*",
+    "onnx/*_q4f16*",
+    "*.task",
+    "flax_model*",
+    "tf_model*",
+    "pytorch_model*",
 ]
 
 
@@ -40,15 +44,26 @@ def download_model(model_dir: Path, hf_token: str | None = None) -> Path:
     if hf_token:
         login(token=hf_token, add_to_git_credential=False)
 
-    print(f"Downloading {REPO_ID} (q4 CPU files + config) ...")
+    print(f"Downloading {REPO_ID} (text-only q4 CPU subset) ...")
     local_dir = snapshot_download(
         repo_id=REPO_ID,
-        allow_patterns=ALLOW_PATTERNS,
+        ignore_patterns=IGNORE_PATTERNS,
         token=hf_token,
         local_dir=str(model_dir),
         local_dir_use_symlinks=False,
     )
     print(f"Model saved to: {local_dir}")
+
+    # Verify required files are present
+    required = [
+        "genai_config.json",
+        "tokenizer.json",
+        "onnx/decoder_model_merged_q4.onnx",
+    ]
+    missing = [f for f in required if not (Path(local_dir) / f).exists()]
+    if missing:
+        raise FileNotFoundError(f"Missing required files after download: {missing}")
+    print("All required files verified.")
     return Path(local_dir)
 
 
