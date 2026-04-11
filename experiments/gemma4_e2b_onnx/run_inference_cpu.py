@@ -30,6 +30,20 @@ def build_session(model_path: Path) -> ort.InferenceSession:
     return ort.InferenceSession(str(model_path), sess_options=opts, providers=["CPUExecutionProvider"])
 
 
+def _build_kv_cache(decoder_sess: ort.InferenceSession, num_layers: int) -> dict:
+    """Initialise empty KV cache based on decoder session's past_key_values inputs."""
+    past_kv: dict = {}
+    for inp in decoder_sess.get_inputs():
+        if inp.name.startswith("past_key_values."):
+            # Shape is dynamic but we initialise to (1, num_heads, 0, head_dim)
+            # ORT will accept this for merged model prefill pass
+            past_kv[inp.name] = np.zeros(
+                [1 if (d is None or isinstance(d, str)) else d for d in inp.shape],
+                dtype=np.float32,
+            )
+    return past_kv
+
+
 def run_inference(model_dir: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS) -> dict:
     """Run text inference using embed_tokens + decoder ONNX sessions with KV cache."""
     if not model_dir.exists():
@@ -64,55 +78,48 @@ def run_inference(model_dir: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TO
     input_ids = inputs["input_ids"].astype(np.int64)  # shape: (1, seq_len)
 
     # --- Embedding pass ---
-    embed_inputs = {"input_ids": input_ids}
-    embed_outputs = embed_sess.run(None, embed_inputs)
+    embed_outputs = embed_sess.run(None, {"input_ids": input_ids})
     embed_names = [o.name for o in embed_sess.get_outputs()]
     embed_map = dict(zip(embed_names, embed_outputs))
     inputs_embeds = embed_map["inputs_embeds"]  # (1, seq_len, hidden)
-
-    # Build per-layer KV cache inputs from embed session outputs
     per_layer_inputs = {k: v for k, v in embed_map.items() if k != "inputs_embeds"}
 
-    # Inspect decoder to set up KV cache buffers
-    decoder_input_names = [inp.name for inp in decoder_sess.get_inputs()]
+    # Build KV cache from decoder session's input schema
+    past_kv = _build_kv_cache(decoder_sess, num_layers=15)
+    decoder_input_names = {inp.name for inp in decoder_sess.get_inputs()}
     decoder_output_names = [out.name for out in decoder_sess.get_outputs()]
-
-    # Determine num_layers from present_* outputs
-    num_layers = sum(1 for n in decoder_output_names if n.startswith("present.") and n.endswith(".key"))
-    if num_layers == 0:
-        num_layers = 18  # Gemma 4 E2B default
-
-    # Initialise empty KV cache
-    batch, heads, kv_seq, head_dim = 1, 8, 0, 256
-    past_kv = {}
-    for layer in range(num_layers):
-        past_kv[f"past_key_values.{layer}.key"] = np.zeros((batch, heads, kv_seq, head_dim), dtype=np.float32)
-        past_kv[f"past_key_values.{layer}.value"] = np.zeros((batch, heads, kv_seq, head_dim), dtype=np.float32)
 
     # --- Prefill pass ---
     seq_len = input_ids.shape[1]
     attention_mask = np.ones((1, seq_len), dtype=np.int64)
     position_ids = np.arange(seq_len, dtype=np.int64).reshape(1, -1)
     use_cache_branch = np.array([False], dtype=bool)
+    num_logits_to_keep = np.array([1], dtype=np.int64)
 
-    prefill_inputs = {
+    prefill_inputs: dict = {
         "inputs_embeds": inputs_embeds,
         "attention_mask": attention_mask,
         "position_ids": position_ids,
         "use_cache_branch": use_cache_branch,
+        "num_logits_to_keep": num_logits_to_keep,
     }
     prefill_inputs.update(past_kv)
     prefill_inputs.update(per_layer_inputs)
 
+    # Only feed inputs the decoder actually expects
+    prefill_inputs = {k: v for k, v in prefill_inputs.items() if k in decoder_input_names}
+
     prefill_outputs = decoder_sess.run(None, prefill_inputs)
     prefill_map = dict(zip(decoder_output_names, prefill_outputs))
 
-    # Update KV cache from prefill
-    for layer in range(num_layers):
-        past_kv[f"past_key_values.{layer}.key"] = prefill_map[f"present.{layer}.key"]
-        past_kv[f"past_key_values.{layer}.value"] = prefill_map[f"present.{layer}.value"]
+    # Update KV cache from prefill presents
+    for key in prefill_map:
+        if key.startswith("present."):
+            past_key = key.replace("present.", "past_key_values.")
+            if past_key in decoder_input_names:
+                past_kv[past_key] = prefill_map[key]
 
-    logits = prefill_map["logits"]  # (1, seq_len, vocab)
+    logits = prefill_map["logits"]  # (1, 1, vocab) with num_logits_to_keep=1
     next_token = int(np.argmax(logits[0, -1, :]))
 
     # --- Autoregressive decode ---
@@ -125,32 +132,35 @@ def run_inference(model_dir: Path, prompt: str, max_tokens: int = DEFAULT_MAX_TO
             break
 
         tok_ids = np.array([[next_token]], dtype=np.int64)
-        # Embed single token
-        tok_embed = embed_sess.run(None, {"input_ids": tok_ids})
-        tok_embed_map = dict(zip(embed_names, tok_embed))
+        tok_embed_out = embed_sess.run(None, {"input_ids": tok_ids})
+        tok_embed_map = dict(zip(embed_names, tok_embed_out))
         step_embeds = tok_embed_map["inputs_embeds"]
         step_per_layer = {k: v for k, v in tok_embed_map.items() if k != "inputs_embeds"}
 
         attn_mask = np.ones((1, total_seq), dtype=np.int64)
         pos_ids = np.array([[total_seq - 1]], dtype=np.int64)
-        use_cache_branch = np.array([True], dtype=bool)
+        use_cache_branch_decode = np.array([True], dtype=bool)
+        num_logits_to_keep_decode = np.array([1], dtype=np.int64)
 
-        decode_inputs = {
+        decode_inputs: dict = {
             "inputs_embeds": step_embeds,
             "attention_mask": attn_mask,
             "position_ids": pos_ids,
-            "use_cache_branch": use_cache_branch,
+            "use_cache_branch": use_cache_branch_decode,
+            "num_logits_to_keep": num_logits_to_keep_decode,
         }
         decode_inputs.update(past_kv)
         decode_inputs.update(step_per_layer)
+        decode_inputs = {k: v for k, v in decode_inputs.items() if k in decoder_input_names}
 
         decode_outputs = decoder_sess.run(None, decode_inputs)
         decode_map = dict(zip(decoder_output_names, decode_outputs))
 
-        # Update KV cache
-        for layer in range(num_layers):
-            past_kv[f"past_key_values.{layer}.key"] = decode_map[f"present.{layer}.key"]
-            past_kv[f"past_key_values.{layer}.value"] = decode_map[f"present.{layer}.value"]
+        for key in decode_map:
+            if key.startswith("present."):
+                past_key = key.replace("present.", "past_key_values.")
+                if past_key in decoder_input_names:
+                    past_kv[past_key] = decode_map[key]
 
         logits = decode_map["logits"]
         next_token = int(np.argmax(logits[0, -1, :]))
