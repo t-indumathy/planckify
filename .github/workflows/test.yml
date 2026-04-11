@@ -56,12 +56,14 @@ jobs:
   # ------------------------------------------------------------------ #
   # Job 2: ONNX Runtime (raw) — Gemma 4 E2B CPU                         #
   # Smoke test: verify imports + deps without model download             #
-  # Full E2E only when model is present (triggered by HF_TOKEN)          #
+  # Full E2E gated on HF_TOKEN env var being set                         #
   # ------------------------------------------------------------------ #
   onnx-runtime-cpu:
     name: ONNX Runtime (raw) — Gemma 4 E2B CPU
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     defaults:
       run:
         working-directory: experiments/gemma4_e2b_onnx
@@ -84,20 +86,18 @@ jobs:
         run: python test_import.py
 
       - name: Download ONNX model (requires HF_TOKEN)
-        if: ${{ secrets.HF_TOKEN != '' }}
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        if: ${{ env.HF_TOKEN != '' }}
         run: python download_model.py
 
       - name: Run CPU inference smoke test
-        if: ${{ secrets.HF_TOKEN != '' }}
+        if: ${{ env.HF_TOKEN != '' }}
         run: |
           python run_inference_cpu.py \
             --prompt "What is the Planck constant?" \
             --max-tokens 32
 
       - name: Run benchmark (5 prompts)
-        if: ${{ secrets.HF_TOKEN != '' }}
+        if: ${{ env.HF_TOKEN != '' }}
         run: python benchmark.py --max-tokens 32
 
       - name: Lint with ruff
