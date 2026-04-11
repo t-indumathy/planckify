@@ -7,10 +7,9 @@ Docs:  https://ai.google.dev/edge/litert-lm/python
 
 Usage:
     python benchmark.py
-    python benchmark.py --model-path ./models/gemma-4-E2B-it-litert-lm.litertlm
+    python benchmark.py --model-path ./models/gemma-4-E2B-it.litertlm
     python benchmark.py --runs 3
 """
-
 import argparse
 import statistics
 import time
@@ -18,7 +17,7 @@ from pathlib import Path
 
 import litert_lm
 
-DEFAULT_MODEL_PATH = Path("./models/gemma-4-E2B-it-litert-lm.litertlm")
+DEFAULT_MODEL_PATH = Path("./models/gemma-4-E2B-it.litertlm")
 
 BENCHMARK_PROMPTS = [
     "What is quantization in machine learning?",
@@ -42,29 +41,29 @@ def run_benchmark(model_path: Path, runs: int = 1) -> None:
     print(f"Prompts : {len(BENCHMARK_PROMPTS)} | Runs per prompt: {runs}")
     print("=" * 70)
 
-    load_start = time.perf_counter()
+    all_ttft: list[float] = []
+    all_tps: list[float] = []
+
     with litert_lm.Engine(
         str(model_path),
         backend=litert_lm.Backend.CPU,
         cache_dir="/tmp/planckify-litert-cache",
     ) as engine:
-        load_latency = time.perf_counter() - load_start
-        print(f"Model loaded in {load_latency:.2f}s\n")
+        for i, prompt in enumerate(BENCHMARK_PROMPTS):
+            print(f"\n[{i+1}/{len(BENCHMARK_PROMPTS)}] Prompt: {prompt[:60]}...")
+            prompt_ttfts: list[float] = []
+            prompt_tps: list[float] = []
 
-        all_ttft: list[float] = []
-        all_decode_tps: list[float] = []
-
-        for i, prompt_text in enumerate(BENCHMARK_PROMPTS, 1):
-            print(f"[{i}/{len(BENCHMARK_PROMPTS)}] {prompt_text[:65]}")
-
-            for run_idx in range(runs):
-                # Fresh conversation per run (no history carry-over)
-                with engine.create_conversation() as conversation:
+            for run in range(runs):
+                messages = [
+                    {"role": "system", "content": [{"type": "text", "text": "You are a helpful AI assistant."}]},
+                ]
+                with engine.create_conversation(messages=messages) as conversation:
                     chunks: list[str] = []
                     first_chunk_time: float | None = None
                     start = time.perf_counter()
 
-                    for chunk in conversation.send_message_async(prompt_text):
+                    for chunk in conversation.send_message_async(prompt):
                         for item in chunk.get("content", []):
                             if item.get("type") == "text":
                                 chunks.append(item["text"])
@@ -73,37 +72,28 @@ def run_benchmark(model_path: Path, runs: int = 1) -> None:
 
                     end = time.perf_counter()
 
-                ttft = (first_chunk_time - start) if first_chunk_time else (end - start)
                 total = end - start
-                approx_tokens = len("".join(chunks).split())
-                decode_tps = approx_tokens / total if total > 0 else 0
+                ttft = (first_chunk_time - start) if first_chunk_time else total
+                response = "".join(chunks)
+                approx_tokens = len(response.split())
+                tps = approx_tokens / total if total > 0 else 0
 
-                all_ttft.append(ttft)
-                all_decode_tps.append(decode_tps)
+                prompt_ttfts.append(ttft)
+                prompt_tps.append(tps)
+                print(f"  Run {run+1}: TTFT={ttft:.3f}s  TPS={tps:.1f}  tokens~={approx_tokens}")
 
-                print(
-                    f"  run {run_idx + 1}: TTFT={ttft:.2f}s | "
-                    f"~{decode_tps:.1f} tk/s | ~{approx_tokens} tokens"
-                )
+            all_ttft.extend(prompt_ttfts)
+            all_tps.extend(prompt_tps)
 
     print("\n" + "=" * 70)
-    print("BENCHMARK SUMMARY")
-    print("=" * 70)
-    print(f"  Total runs         : {len(all_ttft)}")
-    print(f"  Avg TTFT           : {statistics.mean(all_ttft):.2f}s")
-    print(f"  Min / Max TTFT     : {min(all_ttft):.2f}s / {max(all_ttft):.2f}s")
-    print(f"  Avg decode speed   : {statistics.mean(all_decode_tps):.1f} tk/s")
-    print(f"  Min / Max decode   : {min(all_decode_tps):.1f} / {max(all_decode_tps):.1f} tk/s")
-    if len(all_decode_tps) > 1:
-        print(f"  Stddev decode TPS  : {statistics.stdev(all_decode_tps):.2f}")
-    print("=" * 70)
+    print("[Overall Benchmark Summary]")
+    print(f"  TTFT  avg={statistics.mean(all_ttft):.3f}s  min={min(all_ttft):.3f}s  max={max(all_ttft):.3f}s")
+    print(f"  TPS   avg={statistics.mean(all_tps):.1f}  min={min(all_tps):.1f}  max={max(all_tps):.1f}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Benchmark Gemma 4 E2B CPU inference via LiteRT-LM"
-    )
+    parser = argparse.ArgumentParser(description="Benchmark Gemma 4 E2B on CPU via LiteRT-LM")
     parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
-    parser.add_argument("--runs", type=int, default=1, help="Runs per prompt (default: 1)")
+    parser.add_argument("--runs", type=int, default=1, help="Runs per prompt")
     args = parser.parse_args()
-    run_benchmark(args.model_path, args.runs)
+    run_benchmark(model_path=args.model_path, runs=args.runs)
