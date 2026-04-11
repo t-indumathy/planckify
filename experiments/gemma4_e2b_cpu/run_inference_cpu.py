@@ -10,14 +10,13 @@ Usage:
     python run_inference_cpu.py
     python run_inference_cpu.py --prompt "Explain transformers" --max-tokens 256
 """
-
 import argparse
 import time
 from pathlib import Path
 
 import litert_lm
 
-DEFAULT_MODEL_PATH = Path("./models/gemma-4-E2B-it-litert-lm.litertlm")
+DEFAULT_MODEL_PATH = Path("./models/gemma-4-E2B-it.litertlm")
 DEFAULT_MAX_TOKENS = 512
 SYSTEM_PROMPT = "You are a helpful AI assistant running on-device via LiteRT-LM."
 
@@ -45,7 +44,6 @@ def run_inference(model_path: Path, prompt: str, max_tokens: int = DEFAULT_MAX_T
     ]
 
     load_start = time.perf_counter()
-
     with litert_lm.Engine(
         str(model_path),
         backend=litert_lm.Backend.CPU,
@@ -73,12 +71,12 @@ def run_inference(model_path: Path, prompt: str, max_tokens: int = DEFAULT_MAX_T
                             first_chunk_time = time.perf_counter()
 
             infer_end = time.perf_counter()
-
-    print("\n" + "-" * 60)
+            print("\n" + "-" * 60)
 
     full_response = "".join(response_chunks)
     total_latency = infer_end - infer_start
     ttft = (first_chunk_time - infer_start) if first_chunk_time else total_latency
+
     # Approximate token count (word-level proxy)
     approx_tokens = len(full_response.split())
     decode_tps = approx_tokens / total_latency if total_latency > 0 else 0
@@ -94,12 +92,11 @@ def run_inference(model_path: Path, prompt: str, max_tokens: int = DEFAULT_MAX_T
     }
 
     print("\n[Metrics]")
-    print(f"  Model load time   : {metrics['model_load_latency_s']}s")
-    print(f"  TTFT              : {metrics['ttft_s']}s")
-    print(f"  Total decode time : {metrics['total_latency_s']}s")
-    print(f"  Approx tokens out : {metrics['approx_tokens_generated']}")
-    print(f"  Approx decode TPS : {metrics['approx_decode_tps']} tokens/sec")
-
+    print(f"  Model load time : {metrics['model_load_latency_s']}s")
+    print(f"  TTFT            : {metrics['ttft_s']}s")
+    print(f"  Total decode    : {metrics['total_latency_s']}s")
+    print(f"  Approx tokens   : {metrics['approx_tokens_generated']}")
+    print(f"  Approx TPS      : {metrics['approx_decode_tps']} tokens/sec")
     return metrics
 
 
