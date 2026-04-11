@@ -1,4 +1,4 @@
-name: planckify CI — LiteRT-LM + ONNX Runtime GenAI
+name: planckify CI — LiteRT-LM + ONNX Runtime
 
 on:
   push:
@@ -8,103 +8,99 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ── Job 1: LiteRT-LM / Gemma 4 E2B / CPU ────────────────────────────────
+  # ------------------------------------------------------------------ #
+  # Job 1: LiteRT-LM — Gemma 4 E2B CPU                                  #
+  # Full end-to-end: download model + run inference + benchmark          #
+  # ------------------------------------------------------------------ #
   litert-lm-cpu:
     name: LiteRT-LM — Gemma 4 E2B CPU
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     defaults:
       run:
         working-directory: experiments/gemma4_e2b_cpu
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: experiments/gemma4_e2b_cpu/requirements.txt
+
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Verify litert_lm import and CPU backend
-        run: |
-          python -c "
-          import litert_lm
-          assert hasattr(litert_lm, 'Engine'), 'Engine missing'
-          assert hasattr(litert_lm.Backend, 'CPU'), 'CPU backend missing'
-          assert hasattr(litert_lm, 'LogSeverity'), 'LogSeverity missing'
-          print('litert_lm import OK')
-          "
-      - name: Download Gemma 4 E2B model from HuggingFace
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python download_model.py
+        run: pip install -r requirements.txt
+
+      - name: Download Gemma 4 E2B model
+        run: python download_model.py
+
       - name: Run CPU inference smoke test
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python run_inference_cpu.py \
-            --prompt "Explain what LiteRT-LM is in one sentence." \
-            --max-tokens 64
+            --prompt "What is the Planck constant?" \
+            --max-tokens 32
+
       - name: Run benchmark (5 prompts)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python benchmark.py --runs 1
+        run: python benchmark.py --max-tokens 32
+
       - name: Lint with ruff
-        continue-on-error: true
         run: |
           pip install ruff
           ruff check .
 
-  # ── Job 2: ONNX Runtime / Gemma 4 E2B / CPU ─────────────────────────────
-  onnx-genai-cpu:
-    name: ONNX Runtime GenAI — Gemma 4 E2B CPU
+  # ------------------------------------------------------------------ #
+  # Job 2: ONNX Runtime (raw) — Gemma 4 E2B CPU                         #
+  # Smoke test: verify imports + deps without model download             #
+  # Full E2E only when model is present (triggered by HF_TOKEN)          #
+  # ------------------------------------------------------------------ #
+  onnx-runtime-cpu:
+    name: ONNX Runtime (raw) — Gemma 4 E2B CPU
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
       run:
         working-directory: experiments/gemma4_e2b_onnx
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Verify onnxruntime import
-        run: |
-          python -c "
-          import onnxruntime as ort
-          print('onnxruntime version:', ort.__version__)
-          assert 'CPUExecutionProvider' in ort.get_available_providers()
-          print('CPUExecutionProvider OK')
-          "
-      - name: Download Gemma 4 E2B ONNX model from HuggingFace
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: experiments/gemma4_e2b_onnx/requirements.txt
+
+      - name: Install dependencies (no torch/torchvision)
+        run: pip install -r requirements.txt
+
+      - name: Run import smoke test (no model needed)
+        run: python test_import.py
+
+      - name: Download ONNX model (requires HF_TOKEN)
+        if: ${{ secrets.HF_TOKEN != '' }}
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python download_model.py
+        run: python download_model.py
+
       - name: Run CPU inference smoke test
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        if: ${{ secrets.HF_TOKEN != '' }}
         run: |
           python run_inference_cpu.py \
-            --prompt "Explain what ONNX Runtime GenAI is in one sentence." \
-            --max-tokens 64
+            --prompt "What is the Planck constant?" \
+            --max-tokens 32
+
       - name: Run benchmark (5 prompts)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python benchmark.py --runs 1
+        if: ${{ secrets.HF_TOKEN != '' }}
+        run: python benchmark.py --max-tokens 32
+
       - name: Lint with ruff
-        continue-on-error: true
         run: |
           pip install ruff
           ruff check .
