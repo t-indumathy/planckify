@@ -13,6 +13,49 @@
 | `gemma4_e2b_cpu` | LiteRT-LM | Gemma 4 E2B it | int4 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
 | `gemma4_e2b_onnx` | ONNX Runtime (raw) | Gemma 4 E2B it | q4 (`decoder_model_merged_q4.onnx`) | CPU (ORT) | 🟢 Active |
 
+## Why not onnxruntime-genai?
+
+The natural first choice for running a Gemma 4 ONNX model would be `onnxruntime-genai` (OGA) — Microsoft's high-level GenAI loop built on top of ONNX Runtime. However, **Gemma 4 is not supported by `onnxruntime-genai` v0.12.2** (the latest release as of April 2026) due to three architectural features introduced in the Gemma 4 family that OGA's runtime and model builder do not yet handle:
+
+### 1. Per-Layer Embeddings (PLE)
+
+Gemma 4's `embed_tokens` session produces **two outputs** instead of one:
+
+- `inputs_embeds` — standard `[batch, seq, hidden_size]` embedding
+- `per_layer_inputs` — `[batch, seq, num_hidden_layers, hidden_size_per_layer_input]` (e.g. `[batch, seq, 35, 256]` for E2B), where each transformer layer receives its own embedding slice
+
+OGA's inference loop expects a single embedding tensor to flow into the decoder stack. There is no mechanism to route per-layer inputs to individual attention blocks.
+
+### 2. Variable Attention Head Dimensions
+
+Gemma 4 uses **two different head dimensions** depending on the attention pattern:
+
+- Sliding attention layers (most layers): `head_dim = 256`
+- Full attention layers (every 5th layer — indices 4, 9, 14, 19, 24, 29, 34): `global_head_dim = 512`
+
+`genai_config.json` only supports a single `head_size` field. OGA allocates KV cache buffers using this single value for all layers, causing shape mismatches at full-attention layers at load time.
+
+### 3. KV Cache Sharing
+
+Gemma 4 E2B has 35 decoder layers but only **15 unique KV cache pairs** (controlled by `num_kv_shared_layers: 20`). OGA expects one `past_key_values.N` input/output pair per layer; when the ONNX model only exposes 15 unique KV outputs for 35 layers, the KV cache management breaks.
+
+### Workarounds attempted (and failed)
+
+- Patching `builder.py` to route `Gemma4ForConditionalGeneration` through the Gemma 3 pipeline → produces ONNX but fails at runtime with `ShapeInferenceError` at full-attention layers (layer 4, `global_head_dim=512` vs expected `256`)
+- Changing `genai_config.json` model type from `gemma4` to `gemma3_text` → same shape error
+- Loading `onnx-community/gemma-4-E2B-it-ONNX` directly via OGA → incompatible I/O contract (separate `embed_tokens.onnx` + `per_layer_inputs` tensor not understood by OGA's KV cache manager)
+
+### Result
+
+The `gemma4_e2b_onnx` experiment therefore drives the ONNX model using **two raw `onnxruntime.InferenceSession` objects** — one for `embed_tokens_q4.onnx` and one for `decoder_model_merged_q4.onnx` — and manages the KV cache manually in Python. This bypasses OGA entirely and works today.
+
+### Tracking issues
+
+- [microsoft/onnxruntime-genai#2062](https://github.com/microsoft/onnxruntime-genai/issues/2062) — Feature request: Gemma 4 support (PLE, variable head dims, KV cache sharing) — **Open**
+- [microsoft/onnxruntime-genai#2059](https://github.com/microsoft/onnxruntime-genai/issues/2059) — General question: any plans for Gemma 4 support? — **Open**
+
+---
+
 ## Quantization: int4 (LiteRT-LM) vs q4 (ONNX)
 
 Both experiments run **4-bit quantized decoder weights** — the naming difference is purely a framework convention, not a difference in precision:
@@ -140,3 +183,5 @@ python benchmark.py --runs 1
 - [ONNX Runtime Python API](https://onnxruntime.ai/docs/api/python/api_summary.html)
 - [LiteRT-LM GitHub](https://github.com/google-ai-edge/LiteRT-LM)
 - [ONNX Runtime GitHub](https://github.com/microsoft/onnxruntime)
+- [onnxruntime-genai#2062 — Gemma 4 support request](https://github.com/microsoft/onnxruntime-genai/issues/2062)
+- [onnxruntime-genai#2059 — Gemma 4 plans?](https://github.com/microsoft/onnxruntime-genai/issues/2059)
