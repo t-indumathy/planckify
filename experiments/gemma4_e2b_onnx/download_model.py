@@ -1,10 +1,9 @@
 """Download Gemma 4 E2B ONNX model from HuggingFace.
 
 Model: onnx-community/gemma-4-E2B-it-ONNX
-Files: genai_config.json + q4 quantized ONNX decoder + embedder (text-only CPU)
-Docs:  https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX
+Files: q4 quantized ONNX decoder + tokenizer (text-only CPU, raw onnxruntime)
+Docs: https://huggingface.co/onnx-community/gemma-4-E2B-it-ONNX
 """
-
 import os
 import argparse
 from pathlib import Path
@@ -36,9 +35,11 @@ def download_model(model_dir: Path, hf_token: str | None = None) -> Path:
     """Download the q4 ONNX model files from HuggingFace Hub."""
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    genai_config = model_dir / "genai_config.json"
-    if genai_config.exists():
+    # Check if already downloaded (look for any .onnx file)
+    existing_onnx = list(model_dir.rglob("*.onnx"))
+    if existing_onnx:
         print(f"Model already exists at {model_dir}, skipping download.")
+        print(f"Found ONNX files: {[str(f) for f in existing_onnx]}")
         return model_dir
 
     if hf_token:
@@ -54,16 +55,20 @@ def download_model(model_dir: Path, hf_token: str | None = None) -> Path:
     )
     print(f"Model saved to: {local_dir}")
 
-    # Verify required files are present
-    required = [
-        "genai_config.json",
-        "tokenizer.json",
-        "onnx/decoder_model_merged_q4.onnx",
-    ]
-    missing = [f for f in required if not (Path(local_dir) / f).exists()]
+    # Verify required files are present — tokenizer + at least one ONNX file
+    onnx_files = list(Path(local_dir).rglob("*.onnx"))
+    tokenizer_json = Path(local_dir) / "tokenizer.json"
+
+    missing = []
+    if not tokenizer_json.exists():
+        missing.append("tokenizer.json")
+    if not onnx_files:
+        missing.append("*.onnx (no ONNX model files found)")
+
     if missing:
         raise FileNotFoundError(f"Missing required files after download: {missing}")
-    print("All required files verified.")
+
+    print(f"Verified: tokenizer.json OK, ONNX files: {[str(f) for f in onnx_files]}")
     return Path(local_dir)
 
 
@@ -72,6 +77,5 @@ if __name__ == "__main__":
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--hf-token", type=str, default=os.environ.get("HF_TOKEN"))
     args = parser.parse_args()
-
     path = download_model(args.model_dir, args.hf_token)
     print(f"Ready: {path}")
