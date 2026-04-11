@@ -1,4 +1,4 @@
-name: E2E Test — Gemma 4 E2B CPU
+name: planckify CI — LiteRT-LM + ONNX Runtime GenAI
 
 on:
   push:
@@ -8,7 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  e2e-cpu-test:
+  # ── Job 1: LiteRT-LM / Gemma 4 E2B / CPU ────────────────────────────────
+  litert-lm-cpu:
+    name: LiteRT-LM — Gemma 4 E2B CPU
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
@@ -53,7 +55,68 @@ jobs:
             --prompt "Explain what LiteRT-LM is in one sentence." \
             --max-tokens 64
 
-      - name: Run benchmark (3 prompts)
+      - name: Run benchmark (5 prompts)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python benchmark.py --runs 1
+
+      - name: Lint with ruff
+        continue-on-error: true
+        run: |
+          pip install ruff
+          ruff check .
+
+  # ── Job 2: ONNX Runtime GenAI / Gemma 4 E2B / CPU ───────────────────────
+  onnx-genai-cpu:
+    name: ONNX Runtime GenAI — Gemma 4 E2B CPU
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: experiments/gemma4_e2b_onnx
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify onnxruntime_genai import
+        run: |
+          python -c "
+          import onnxruntime_genai as og
+          print('onnxruntime_genai imported successfully')
+          print('Version:', og.__version__)
+          assert hasattr(og, 'Model'), 'Model class missing'
+          assert hasattr(og, 'Generator'), 'Generator class missing'
+          assert hasattr(og, 'Tokenizer'), 'Tokenizer class missing'
+          print('All checks passed — Model, Generator, Tokenizer present')
+          "
+
+      - name: Download Gemma 4 E2B ONNX model from HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python download_model.py
+
+      - name: Run CPU inference smoke test
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python run_inference_cpu.py \
+            --prompt "Explain what ONNX Runtime GenAI is in one sentence." \
+            --max-tokens 64
+
+      - name: Run benchmark (5 prompts)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
