@@ -14,7 +14,6 @@ Usage:
 import argparse
 import time
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import onnxruntime as ort
@@ -42,20 +41,16 @@ def _init_kv_cache(decoder_sess: ort.InferenceSession) -> dict:
     for inp in decoder_sess.get_inputs():
         if not inp.name.startswith("past_key_values."):
             continue
-        # Replace every dynamic dim with its nearest sensible default:
-        #   axis-0 (batch)    -> 1
-        #   axis-2 (seq_len)  -> 0   (empty cache)
-        #   all others        -> static int from schema
         shape = []
         for idx, d in enumerate(inp.shape):
             if isinstance(d, int) and d > 0:
                 shape.append(d)
             elif idx == 0:  # batch
                 shape.append(1)
-            elif idx == 2:  # sequence length
+            elif idx == 2:  # sequence length -> empty
                 shape.append(0)
             else:
-                shape.append(1)  # fallback for unknown dynamic dims
+                shape.append(1)  # fallback
         past_kv[inp.name] = np.zeros(shape, dtype=np.float32)
     return past_kv
 
@@ -90,25 +85,21 @@ def run_inference(
     decoder_sess = build_session(decoder_path)
     load_time = time.perf_counter() - load_start
 
-    # Tokenize
     messages = [{"role": "user", "content": prompt}]
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = tokenizer(text, return_tensors="np")
     input_ids = inputs["input_ids"].astype(np.int64)
 
-    # Embedding pass
     embed_outputs = embed_sess.run(None, {"input_ids": input_ids})
     embed_names = [o.name for o in embed_sess.get_outputs()]
     embed_map = dict(zip(embed_names, embed_outputs))
     inputs_embeds = embed_map["inputs_embeds"]
     per_layer_inputs = {k: v for k, v in embed_map.items() if k != "inputs_embeds"}
 
-    # KV cache + decoder metadata
     past_kv = _init_kv_cache(decoder_sess)
     decoder_input_names: set = {inp.name for inp in decoder_sess.get_inputs()}
     decoder_output_names = [out.name for out in decoder_sess.get_outputs()]
 
-    # Prefill
     seq_len = input_ids.shape[1]
     prefill_feed: dict = {
         "inputs_embeds": inputs_embeds,
@@ -124,7 +115,6 @@ def run_inference(
     prefill_outs = decoder_sess.run(None, prefill_feed)
     prefill_map = dict(zip(decoder_output_names, prefill_outs))
 
-    # Update KV cache
     for key, val in prefill_map.items():
         if key.startswith("present."):
             pkey = key.replace("present.", "past_key_values.")
@@ -133,7 +123,6 @@ def run_inference(
 
     next_token = int(np.argmax(prefill_map["logits"][0, -1, :]))
 
-    # Autoregressive decode
     gen_start = time.perf_counter()
     generated_ids = [next_token]
     total_seq = seq_len + 1
