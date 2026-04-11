@@ -46,7 +46,7 @@ jobs:
             --max-tokens 32
 
       - name: Run benchmark (5 prompts)
-        run: python benchmark.py --max-tokens 32
+        run: python benchmark.py --runs 1
 
       - name: Lint with ruff
         run: |
@@ -98,7 +98,7 @@ jobs:
 
       - name: Run benchmark (5 prompts)
         if: ${{ env.HF_TOKEN != '' }}
-        run: python benchmark.py --max-tokens 32
+        run: python benchmark.py --runs 1
 
       - name: Lint with ruff
         run: |
