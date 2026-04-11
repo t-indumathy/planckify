@@ -1,0 +1,6 @@
+# ONNX Runtime GenAI — Gemma 4 E2B CPU experiment
+onnxruntime-genai>=0.6.0
+huggingface-hub>=0.22.0
+transformers>=4.40.0
+numpy>=1.26.0
+tqdm>=4.66.0
