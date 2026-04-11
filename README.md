@@ -109,15 +109,19 @@ python run_inference_cpu.py --prompt "Explain quantization in neural networks"
 python benchmark.py --runs 1
 ```
 
-## Expected CPU Baselines (Linux x86-64, GitHub Actions runner)
+## CI Baselines — GitHub Actions (Ubuntu x86-64, 2 vCPU)
+
+> Measured on run [#36](https://github.com/t-indumathy/planckify/actions/runs/24287930708) · 5 prompts · 64 max tokens each
 
 | Metric | LiteRT-LM (int4) | ONNX Runtime raw (q4) |
 |---|---|---|
-| Decode speed | ~35 tok/s | ~4 tok/s |
-| Latency (64 tokens) | ~4 s | ~30 s |
+| Decode speed avg | 14.7 tok/s | 5.4 tok/s |
+| Decode speed min/max | 11.5 / 15.7 tok/s | 5.3 / 5.4 tok/s |
+| TTFT / latency avg | 0.998 s | 11.91 s |
+| TTFT / latency min/max | 0.836 / 1.636 s | 11.84 / 12.01 s |
 | Peak RAM | ~3.5 GB | ~3.5 GB |
 
-> **Note:** The ONNX raw path runs the full dual-session KV-cache decode loop without any GenAI-level optimisation (no beam search fusing, no CUDA EP). The ~4 tok/s on a 2-vCPU runner is the floor; native hardware with AVX-512 or a dedicated ORT build will be significantly faster.
+> **Note:** ONNX raw runs a full dual-session KV-cache decode loop with no GenAI-level fusion. The 5.4 tok/s on a 2-vCPU runner is the baseline floor — native AVX-512 hardware or a GPU EP will be significantly faster. LiteRT-LM's XNNPACK kernel is highly optimised for this workload, hence the ~2.7× throughput advantage on the same runner.
 
 ## Requirements
 
