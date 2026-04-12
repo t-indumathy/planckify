@@ -20,7 +20,7 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     defaults:
       run:
-        working-directory: experiments/gemma4_e2b_cpu
+        working-directory: experiments/gemma4_e2b_litertlm
 
     steps:
       - name: Checkout
@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: experiments/gemma4_e2b_cpu/requirements.txt
+          cache-dependency-path: experiments/gemma4_e2b_litertlm/requirements.txt
 
       - name: Install dependencies
         run: pip install -r requirements.txt

@@ -1,0 +1,9 @@
+# Locust load test dependencies for planckify
+#
+# Install into whichever venv already has litert-lm / onnxruntime:
+#   pip install -r locust_tests/requirements.txt
+#
+# Note: litert-lm, onnxruntime, transformers and numpy must already be
+# available via the respective experiment requirements.txt files.
+
+locust>=2.24.0

@@ -10,7 +10,7 @@
 
 | Experiment | Framework | Model | Quantization | Backend | Status |
 |---|---|---|---|---|---|
-| `gemma4_e2b_cpu` | LiteRT-LM | Gemma 4 E2B it | int4 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
+| `gemma4_e2b_litertlm` | LiteRT-LM | Gemma 4 E2B it | int4 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
 | `gemma4_e2b_onnx` | ONNX Runtime (raw) | Gemma 4 E2B it | q4 (`decoder_model_merged_q4.onnx`) | CPU (ORT) | 🟢 Active |
 
 ## Why not onnxruntime-genai?
@@ -76,7 +76,7 @@ Both experiments run **4-bit quantized decoder weights** — the naming differen
 ```
 planckify/
 ├── experiments/
-│   ├── gemma4_e2b_cpu/          # LiteRT-LM experiment
+│   ├── gemma4_e2b_litertlm/     # LiteRT-LM experiment
 │   │   ├── requirements.txt
 │   │   ├── download_model.py    # Pulls gemma-4-E2B-it.litertlm from HF
 │   │   ├── run_inference_cpu.py # Engine -> create_conversation -> send_message_async
@@ -97,7 +97,7 @@ planckify/
 ### 1. Install dependencies
 
 ```bash
-cd experiments/gemma4_e2b_cpu
+cd experiments/gemma4_e2b_litertlm
 pip install -r requirements.txt
 ```
 
