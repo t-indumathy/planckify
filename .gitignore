@@ -24,10 +24,7 @@ env/
 .env
 .env.local
 
-# Benchmark outputs
-benchmark_results/
-*.json
-*.csv
+
 
 # OS
 .DS_Store

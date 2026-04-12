@@ -1,0 +1,101 @@
+seq,prompt_snippet,gen_time_s,tokens_generated,decode_speed_tok_s
+1,What is dependency injection and when should you use it?,23.8694,64,2.68
+2,What is biodiversity and why does it matter for ecosystems?,23.082,64,2.77
+3,Write a short poem about the night sky.,24.3505,64,2.63
+4,What is CRISPR-Cas9 gene editing and how does it work?,23.3845,64,2.74
+5,What is the difference between an acid and a base?,23.2236,64,2.76
+6,How does the use of metaphor enhance writing?,21.6714,64,2.95
+7,Explain the difference between covalent and ionic bonding.,22.0219,64,2.91
+8,Explain the attention mechanism in transformer models.,23.1847,64,2.76
+9,Write a Python function to check if a number is prime.,23.6066,64,2.71
+10,What is the difference between an acid and a base?,21.1313,64,3.03
+11,How does Einstein's special theory of relativity change our understanding of tim,21.0033,64,3.05
+12,What is the difference between mitosis and meiosis?,22.1753,64,2.89
+13,How do vaccines train the immune system?,19.799,64,3.23
+14,Explain the Big Bang theory and the evidence supporting it.,20.4348,64,3.13
+15,Explain the concept of recursion with a clear example.,23.2807,64,2.75
+16,What is the difference between climate and weather?,24.0349,64,2.66
+17,What is dark matter and why is it hard to detect?,23.6521,64,2.71
+18,What is the travelling salesman problem and why is it hard?,27.4184,64,2.33
+19,How does ocean acidification happen and what are its effects?,25.0694,64,2.55
+20,How do solid-state drives (SSDs) work compared to hard drives?,25.8589,64,2.47
+21,Prove that the square root of 2 is irrational.,27.5369,64,2.32
+22,What is the Monty Hall problem and what is the correct solution?,26.8774,64,2.38
+23,Explain the concept of recursion with a clear example.,24.8038,64,2.58
+24,Explain the trolley problem in ethics.,26.2153,64,2.44
+25,Describe the main themes of Shakespeare's Hamlet.,26.1957,64,2.44
+26,What is GDP and how is it measured?,28.6467,64,2.23
+27,What is the difference between ONNX and TensorFlow Lite model formats?,26.3111,64,2.43
+28,How does BERT differ from GPT architecturally?,26.2275,64,2.44
+29,How does the greenhouse effect work?,25.5887,64,2.5
+30,What is the difference between mitosis and meiosis?,24.3059,64,2.63
+31,Explain the electromagnetic spectrum from radio waves to gamma rays.,25.0935,64,2.55
+32,How does the periodic table organise the elements?,25.4353,64,2.52
+33,What is dependency injection and when should you use it?,23.898,64,2.68
+34,How does a neural network learn from data through backpropagation?,25.1536,64,2.54
+35,How do you optimise a slow SQL query?,25.1186,64,2.55
+36,How do vaccines train the immune system?,25.9231,64,2.47
+37,What is the time complexity of quicksort in the average case?,25.0002,64,2.56
+38,How does the greenhouse effect work?,23.8387,64,2.68
+39,Explain floating-point precision errors with an example.,24.4047,64,2.62
+40,Explain the significance of the French Revolution for modern politics.,26.1713,64,2.45
+41,How do vaccines train the immune system?,23.6235,64,2.71
+42,How does a hash map work internally?,25.6325,64,2.5
+43,Describe the main themes of Shakespeare's Hamlet.,23.7907,64,2.69
+44,How does plate tectonics and continental drift work?,25.3585,64,2.52
+45,How does BERT differ from GPT architecturally?,25.5144,64,2.51
+46,What is Gödel's incompleteness theorem?,26.1199,64,2.45
+47,How does garbage collection work in Python?,26.4554,64,2.42
+48,How do Neural Processing Units (NPUs) differ from GPUs and CPUs?,23.8088,64,2.69
+49,How does a black hole form from a dying star?,24.733,64,2.59
+50,Write a short poem about the night sky.,27.4939,64,2.33
+51,How does a CPU execute machine instructions?,25.5003,64,2.51
+52,What is the Drake equation and what does it estimate?,23.7918,64,2.69
+53,What is the difference between RAM and ROM?,25.4958,64,2.51
+54,What is the difference between a permutation and a combination?,26.328,64,2.43
+55,What is entropy in thermodynamics?,26.6822,64,2.4
+56,How do Neural Processing Units (NPUs) differ from GPUs and CPUs?,26.1281,64,2.45
+57,Explain the electromagnetic spectrum from radio waves to gamma rays.,26.2654,64,2.44
+58,Explain how the internet routes data packets from source to destination.,25.7125,64,2.49
+59,Explain gradient descent and its variants.,26.171,64,2.45
+60,How do vaccines train the immune system?,26.2295,64,2.44
+61,What were the causes and consequences of the Cold War?,25.9311,64,2.47
+62,Explain Euler's identity e^(iπ) + 1 = 0.,28.6361,64,2.23
+63,Explain the Big Bang theory and the evidence supporting it.,25.8994,64,2.47
+64,What were the main causes of World War I?,26.2213,64,2.44
+65,What is a convolutional neural network and what is it good at?,25.4098,64,2.52
+66,How are stars formed from nebulae?,26.5896,64,2.41
+67,Describe the structure and function of a neuron.,29.6877,64,2.16
+68,Describe the main themes of Shakespeare's Hamlet.,26.1378,64,2.45
+69,Explain how solar and wind renewable energy sources work.,26.0505,64,2.46
+70,Describe the structure and function of a neuron.,24.1272,64,2.65
+71,Explain quantum entanglement in simple terms.,24.393,64,2.62
+72,How do vaccines train the immune system?,24.692,64,2.59
+73,How does dropout regularisation prevent overfitting?,26.7332,64,2.39
+74,What is polymerisation and give a real-world example.,24.6122,64,2.6
+75,What is Gödel's incompleteness theorem?,25.3272,64,2.53
+76,How does the immune system fight a bacterial infection?,24.8364,64,2.58
+77,Describe the fall of the Western Roman Empire.,24.3173,64,2.63
+78,What is quantisation in machine learning and why does it matter for edge devices,25.9188,64,2.47
+79,What are the main differences between supervised and unsupervised learning?,26.244,64,2.44
+80,What is the difference between an acid and a base?,25.3815,64,2.52
+81,How are stars formed from nebulae?,24.7891,64,2.58
+82,What is reinforcement learning and where is it applied?,25.7098,64,2.49
+83,Describe the structure and function of a neuron.,24.5748,64,2.6
+84,What is the difference between a permutation and a combination?,26.3898,64,2.43
+85,Explain the law of supply and demand.,23.7572,64,2.69
+86,Describe the double-slit experiment and what it reveals about light.,21.9124,64,2.92
+87,How does 5G differ from 4G in terms of technology?,19.7857,64,3.23
+88,What makes a compelling opening paragraph for a short story?,20.2342,64,3.16
+89,Explain the concept of opportunity cost with an example.,20.854,64,3.07
+90,What is entropy in thermodynamics?,19.9633,64,3.21
+91,What is the Ring of Fire and why is it geologically active?,19.8985,64,3.22
+92,What is quantisation in machine learning and why does it matter for edge devices,20.5662,64,3.11
+93,How does plate tectonics and continental drift work?,19.9829,64,3.2
+94,Explain floating-point precision errors with an example.,20.0353,64,3.19
+95,What is comparative advantage in international trade?,20.2835,64,3.16
+96,Describe Russell's paradox in set theory.,20.5026,64,3.12
+97,Explain the difference between a stack and a queue.,19.7593,64,3.24
+98,How does ocean acidification happen and what are its effects?,18.5178,64,3.46
+99,Explain the hero's journey narrative structure.,15.1263,64,4.23
+theory of relativity change our understanding of tim,20.3722,64,3.14

@@ -1,0 +1,100 @@
+seq,prompt_snippet,ttft_s,gen_time_s,approx_tokens,decode_speed_tok_s
+1,What is the difference between HTTP and HTTPS?,2.0388,7.1098,45,6.33
+2,How does a CPU execute machine instructions?,0.7658,5.9346,52,8.76
+3,How does BERT differ from GPT architecturally?,0.8204,5.6995,49,8.6
+4,What is reinforcement learning and where is it applied?,0.9276,5.6296,48,8.53
+5,How does the use of metaphor enhance writing?,0.8472,6.5161,52,7.98
+6,Explain how to write effective unit tests for a Python function.,0.7396,5.5365,54,9.75
+7,How do ocean currents affect global climate?,0.7123,5.4561,52,9.53
+8,What is the difference between bacteria and viruses?,0.6767,5.5936,52,9.3
+9,How does DNA replication work?,0.7381,5.5859,55,9.85
+10,Explain the hero's journey narrative structure.,0.8571,6.001,45,7.5
+11,What is the difference between synchronous and asynchronous programming?,0.7715,5.308,44,8.29
+12,Describe the structure and function of a neuron.,0.7064,5.204,56,10.76
+13,Prove that the square root of 2 is irrational.,0.8408,6.0346,38,6.3
+14,How are stars formed from nebulae?,0.7112,5.5762,47,8.43
+15,What is the difference between a permutation and a combination?,0.691,5.9726,48,8.04
+16,Describe the concept of a derivative in calculus.,0.9108,6.5374,48,7.34
+17,What is the Drake equation and what does it estimate?,0.6963,6.6167,48,7.25
+18,Explain the Big Bang theory and the evidence supporting it.,0.6645,5.5066,51,9.26
+19,How does a black hole form from a dying star?,0.6993,5.4931,54,9.83
+20,Explain the electromagnetic spectrum from radio waves to gamma rays.,0.7204,5.5249,49,8.87
+21,Describe the structure and function of a neuron.,0.687,5.526,56,10.13
+22,Explain how the internet routes data packets from source to destination.,0.7192,5.4982,48,8.73
+23,How does a neural network learn from data through backpropagation?,0.7319,5.7391,47,8.19
+24,What is the Drake equation and what does it estimate?,0.7215,5.3242,48,9.02
+25,How does garbage collection work in Python?,0.704,6.387,56,8.77
+26,How does version control with git work at a high level?,0.7031,5.8333,48,8.23
+27,What is comparative advantage in international trade?,0.8213,6.1279,53,8.65
+28,What is the difference between mitosis and meiosis?,1.1669,6.258,49,7.83
+29,How do nuclear reactors generate electricity?,0.7335,5.3492,40,7.48
+30,What is comparative advantage in international trade?,0.725,5.5027,53,9.63
+31,Explain how solar and wind renewable energy sources work.,0.7288,5.4461,51,9.36
+32,Describe the structure and function of a neuron.,0.6992,5.2279,56,10.71
+33,What is the time complexity of quicksort in the average case?,0.6986,5.6593,38,6.71
+34,Describe the double-slit experiment and what it reveals about light.,0.9214,5.7678,52,9.02
+35,What is the difference between HTTP and HTTPS?,0.7217,5.6663,45,7.94
+36,Explain gradient descent and its variants.,0.7632,6.4435,56,8.69
+37,Describe Russell's paradox in set theory.,0.7387,6.2658,50,7.98
+38,What were the causes and consequences of the Cold War?,0.6672,5.6314,53,9.41
+39,What is the Ring of Fire and why is it geologically active?,0.6765,6.2786,52,8.28
+40,What is the Drake equation and what does it estimate?,0.6568,5.0719,48,9.46
+41,What is quantisation in machine learning and why does it matter for edge devices,0.6705,5.3432,49,9.17
+42,Explain the trolley problem in ethics.,1.0819,6.1172,54,8.83
+43,What is the Drake equation and what does it estimate?,0.6755,5.1524,48,9.32
+44,What is reinforcement learning and where is it applied?,0.6752,5.369,48,8.94
+45,Explain quantum entanglement in simple terms.,0.6957,5.1716,52,10.05
+46,What is the time complexity of quicksort in the average case?,0.6738,5.0989,38,7.45
+47,What were the main causes of World War I?,0.6573,5.5284,36,6.51
+48,What makes a compelling opening paragraph for a short story?,0.6791,5.0482,54,10.7
+49,Explain gradient descent and its variants.,0.6742,5.2614,56,10.64
+50,What is quantum computing and why does it matter for cryptography?,0.7841,5.4532,56,10.27
+51,What is the difference between mitosis and meiosis?,0.6721,5.1723,49,9.47
+52,What is reinforcement learning and where is it applied?,0.6475,5.2239,48,9.19
+53,How do nuclear reactors generate electricity?,0.6636,5.1021,40,7.84
+54,Explain the Big Bang theory and the evidence supporting it.,0.664,4.9779,51,10.25
+55,What is the Planck constant and why is it important in physics?,0.6794,5.3067,50,9.42
+56,How does garbage collection work in Python?,0.6727,5.0384,56,11.11
+57,What is GDP and how is it measured?,0.6712,5.2942,49,9.26
+58,What is a neutron star and what are its extreme properties?,0.6763,5.4216,53,9.78
+59,Explain the electromagnetic spectrum from radio waves to gamma rays.,0.6712,4.9563,49,9.89
+60,How does 5G differ from 4G in terms of technology?,0.6657,5.8823,48,8.16
+61,What is dark matter and why is it hard to detect?,0.6614,5.8933,53,8.99
+62,What is dark matter and why is it hard to detect?,0.6778,5.2991,53,10.0
+63,What are the main differences between supervised and unsupervised learning?,0.6936,5.211,51,9.79
+64,Explain the process of containerising an application with Docker.,0.6735,5.0842,57,11.21
+65,What are the main differences between supervised and unsupervised learning?,0.6525,5.0353,51,10.13
+66,Explain quantum entanglement in simple terms.,0.6591,5.125,52,10.15
+67,What is a convolutional neural network and what is it good at?,0.8283,5.7598,49,8.51
+68,What is the Drake equation and what does it estimate?,0.6643,5.1872,48,9.25
+69,What is dependency injection and when should you use it?,0.6809,5.7134,47,8.23
+70,Explain how solar and wind renewable energy sources work.,0.6655,5.1626,51,9.88
+71,How does a neural network learn from data through backpropagation?,0.6741,4.9389,47,9.52
+72,Explain the water cycle in detail.,0.6585,5.2356,49,9.36
+73,Explain the hero's journey narrative structure.,0.6724,4.9991,45,9.0
+74,Explain the electromagnetic spectrum from radio waves to gamma rays.,0.6638,5.0279,49,9.75
+75,Prove that the square root of 2 is irrational.,0.6757,5.2783,38,7.2
+76,How does inflation affect an economy?,0.6703,5.2675,58,11.01
+77,How does inflation affect an economy?,0.6709,4.9033,58,11.83
+78,How does the greenhouse effect work?,0.6791,5.6935,51,8.96
+79,How does garbage collection work in Python?,0.6777,5.0241,56,11.15
+80,What is a neutron star and what are its extreme properties?,0.6789,5.2587,53,10.08
+81,How does DNA replication work?,0.6885,5.2182,55,10.54
+82,Explain gradient descent and its variants.,0.6751,5.272,56,10.62
+83,How do you design a RESTful API?,0.6743,5.8805,48,8.16
+84,How does photosynthesis work at a chemical level?,0.7229,5.3856,52,9.66
+85,What is a convolutional neural network and what is it good at?,0.7298,5.6963,49,8.6
+86,Explain the concept of opportunity cost with an example.,0.7272,5.9316,53,8.94
+87,What is polymerisation and give a real-world example.,0.7322,6.4142,45,7.02
+88,What is comparative advantage in international trade?,0.7326,5.7618,53,9.2
+89,What is dependency injection and when should you use it?,0.7196,5.6974,47,8.25
+90,What is the Drake equation and what does it estimate?,0.7144,5.6826,48,8.45
+91,Explain the CAP theorem in distributed systems.,0.8108,6.026,54,8.96
+92,What is CRISPR-Cas9 gene editing and how does it work?,1.0838,6.3577,44,6.92
+93,Write a Python function to check if a number is prime.,0.9672,6.7128,52,7.75
+94,Explain the CAP theorem in distributed systems.,0.7165,5.628,54,9.59
+95,How does the use of metaphor enhance writing?,0.8188,6.4481,52,8.06
+96,Explain the difference between covalent and ionic bonding.,0.8671,6.519,52,7.98
+97,Explain the concept of opportunity cost with an example.,0.768,5.5118,53,9.62
+98,How does Einstein's special theory of relativity change our understanding of tim,0.7447,5.8985,51,8.65
+99,How do vaccines train the immune system?,0.7143,5.8929,58,9.84

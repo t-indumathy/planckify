@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-04-12T19:09:19.983922Z",
+  "litertlm": {
+    "locust_requests": 89.0,
+    "locust_failures": 0.0,
+    "locust_avg_ms": 5551.860241404456,
+    "locust_p50_ms": 5500.0,
+    "locust_p95_ms": 6400.0,
+    "locust_p99_ms": 7100.0,
+    "locust_rps": 0.1693195474491545,
+    "gen_time_avg_s": 5.603969696969697,
+    "gen_time_p50_s": 5.5249,
+    "gen_time_p95_s": 6.519,
+    "decode_speed_avg": 9.007878787878788,
+    "decode_speed_p50": 9.02,
+    "tokens_avg": 50.121212121212125,
+    "ttft_avg_s": 0.7440242424242425,
+    "ttft_p50_s": 0.6992,
+    "ttft_p95_s": 0.9672
+  },
+  "onnx_runtime": {
+    "locust_requests": 98.0,
+    "locust_failures": 0.0,
+    "locust_avg_ms": 25239.862186887764,
+    "locust_p50_ms": 26000.0,
+    "locust_p95_ms": 28000.0,
+    "locust_p99_ms": 29000.0,
+    "locust_rps": 0.038373903972190294,
+    "gen_time_avg_s": 24.696227,
+    "gen_time_p50_s": 24.918300000000002,
+    "gen_time_p95_s": 27.5369,
+    "decode_speed_avg": 2.6654545454545455,
+    "decode_speed_p50": 2.58,
+    "tokens_avg": 63.3914
+  }
+}
