@@ -11,9 +11,11 @@
 | Experiment | Framework | Model | Quantization | Backend | Status |
 |---|---|---|---|---|---|
 | `gemma4_e2b_litertlm` | LiteRT-LM | Gemma 4 E2B it | int4 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
-| `gemma3_4b_litertlm` | LiteRT-LM | Gemma 3 4B IT | int8 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
+| `gemma3_4b_litertlm` | LiteRT-LM | Gemma 3 4B IT | int8 (`.task` / MediaPipe) | CPU (XNNPACK) | ⚠️ Format incompatible — not benchmarked |
 | `gemma4_e2b_onnx` | ONNX Runtime (raw) | Gemma 4 E2B it | q4 (`decoder_model_merged_q4.onnx`) | CPU (ORT) | 🟢 Active |
 | `gemma3_4b_onnx` | ONNX Runtime (raw) | Gemma 3 4B IT | int8 (`decoder_model_merged_quantized.onnx`) | CPU (ORT) | 🟢 Active |
+
+> **Note on `gemma3_4b_litertlm`:** `litert-community/Gemma3-4B-IT` only publishes `.task` files (MediaPipe/WebGPU format). The `litert_lm.Engine` expects a `.litertlm` zip archive — these formats are incompatible. A `.litertlm` for Gemma 3 4B IT has not been published. This experiment directory is kept for reference.
 
 ## Why not onnxruntime-genai?
 
@@ -121,36 +123,6 @@ python download_model.py
 ```
 
 Pulls `onnx-community/gemma-3-4b-it-ONNX` — int8/quantized subset only (`embed_tokens_quantized.onnx` + `decoder_model_merged_quantized.onnx`, ~5.5 GB).
-
-### 3. Run inference
-
-```bash
-python run_inference_cpu.py --prompt "Explain quantization in neural networks"
-```
-
-### 4. Run benchmark
-
-```bash
-python benchmark.py --runs 1
-```
-
-## Quickstart — Gemma 3 4B IT (LiteRT-LM)
-
-### 1. Install dependencies
-
-```bash
-cd experiments/gemma3_4b_litertlm
-pip install -r requirements.txt
-```
-
-### 2. Download the model
-
-```bash
-export HF_TOKEN=your_token
-python download_model.py
-```
-
-Pulls `litert-community/Gemma3-4B-IT` (~int8).
 
 ### 3. Run inference
 
@@ -277,7 +249,7 @@ python benchmark.py --runs 1
 
 ## References
 
-- [gemma-3-4b-it-litert-lm on HuggingFace](https://huggingface.co/litert-community/Gemma3-4B-IT)
+- [onnx-community/gemma-3-4b-it-ONNX on HuggingFace](https://huggingface.co/onnx-community/gemma-3-4b-it-ONNX)
 - [LiteRT-LM Python API](https://ai.google.dev/edge/litert-lm/python)
 - [LiteRT-LM Overview](https://ai.google.dev/edge/litert-lm/overview)
 - [gemma-4-E2B-it-litert-lm on HuggingFace](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)
