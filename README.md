@@ -4,7 +4,7 @@
 
 ## Overview
 
-`planckify` is a structured experiment repo for running and benchmarking LLMs on-device across multiple inference frameworks. Both experiments target **Gemma 4 E2B** running entirely on **CPU**, using equivalent int4/q4 quantized weights — enabling a fair apples-to-apples framework comparison.
+`planckify` is a structured experiment repo for running and benchmarking LLMs on-device across multiple inference frameworks. Experiments target **Gemma 4 E2B** and **Gemma 3 4B IT** running entirely on **CPU**, using equivalent quantized weights — enabling fair apples-to-apples framework comparisons.
 
 ## Experiments
 
@@ -13,6 +13,7 @@
 | `gemma4_e2b_litertlm` | LiteRT-LM | Gemma 4 E2B it | int4 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
 | `gemma3_4b_litertlm` | LiteRT-LM | Gemma 3 4B IT | int8 (baked into `.litertlm`) | CPU (XNNPACK) | 🟢 Active |
 | `gemma4_e2b_onnx` | ONNX Runtime (raw) | Gemma 4 E2B it | q4 (`decoder_model_merged_q4.onnx`) | CPU (ORT) | 🟢 Active |
+| `gemma3_4b_onnx` | ONNX Runtime (raw) | Gemma 3 4B IT | int8 (`decoder_model_merged_quantized.onnx`) | CPU (ORT) | 🟢 Active |
 
 ## Why not onnxruntime-genai?
 
@@ -92,10 +93,45 @@ planckify/
 │       ├── download_model.py    # Pulls decoder_model_merged_q4.onnx from HF
 │       ├── run_inference_cpu.py # Two ORT sessions: embed_tokens + decoder (KV cache)
 │       └── benchmark.py         # 5-prompt benchmark, min/avg/max stats
+│   └── gemma3_4b_onnx/          # Raw ONNX Runtime experiment (Gemma 3 4B IT int8)
+│       ├── requirements.txt
+│       ├── download_model.py    # Pulls embed_tokens_quantized + decoder_model_merged_quantized
+│       ├── run_inference_cpu.py # Two ORT sessions: embed_tokens + decoder (KV cache, int8)
+│       └── benchmark.py         # 5-prompt benchmark, min/avg/max stats
 ├── .github/
 │   └── workflows/
 │       └── test.yml             # Parallel CI: litert-lm-cpu + onnx-raw-cpu
 └── .gitignore
+```
+
+## Quickstart — Gemma 3 4B IT (ONNX Runtime int8)
+
+### 1. Install dependencies
+
+```bash
+cd experiments/gemma3_4b_onnx
+pip install -r requirements.txt
+```
+
+### 2. Download the model
+
+```bash
+export HF_TOKEN=your_token
+python download_model.py
+```
+
+Pulls `onnx-community/gemma-3-4b-it-ONNX` — int8/quantized subset only (`embed_tokens_quantized.onnx` + `decoder_model_merged_quantized.onnx`, ~5.5 GB).
+
+### 3. Run inference
+
+```bash
+python run_inference_cpu.py --prompt "Explain quantization in neural networks"
+```
+
+### 4. Run benchmark
+
+```bash
+python benchmark.py --runs 1
 ```
 
 ## Quickstart — Gemma 3 4B IT (LiteRT-LM)
@@ -201,6 +237,21 @@ python benchmark.py --runs 1
 | Peak RAM | ~3.5 GB | ~3.5 GB |
 
 > **Note:** ONNX raw runs a full dual-session KV-cache decode loop with no GenAI-level fusion. The 5.4 tok/s on a 2-vCPU runner is the baseline floor — native AVX-512 hardware or a GPU EP will be significantly faster. LiteRT-LM's XNNPACK kernel is highly optimised for this workload, hence the ~2.7× throughput advantage on the same runner.
+
+## Local Machine Baselines (macOS Apple Silicon)
+
+> Measured locally on macOS (Apple Silicon) · Python 3.14 · `.venv` native · 10 prompts · 64 max tokens each · **partial run (stopped early)**
+
+| Metric | Gemma 3 4B ONNX int8 |
+|---|---|
+| Avg decode speed | 0.39 tok/s |
+| Min / Max decode speed | 0.31 / 0.43 tok/s |
+| Avg decode time | 164.6 s |
+| Min / Max decode time | 147.3 / 204.3 s |
+| Tokens generated | 64 (all hit cap) |
+| Peak RAM | ~4.2 GB |
+
+> **Note:** macOS Apple Silicon uses ARM NEON — not AVX-512 VNNI. Expect **2–4× higher throughput** on a Linux x86_64 node with AVX-512 VNNI (e.g. Intel Ice Lake / Sapphire Rapids). See [benchmark report](locust_tests/results/benchmark_report.md) for projected OCP numbers.
 
 ## Local Machine Baselines (x86-64)
 

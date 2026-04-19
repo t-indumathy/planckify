@@ -1,0 +1,13 @@
+seq,prompt_snippet,gen_time_s,tokens_generated,decode_speed_tok_s
+1,Explain the hero's journey narrative structure.,147.3216,64,0.43
+2,Explain how solar and wind renewable energy sources work.,148.6046,64,0.43
+3,What is the Ring of Fire and why is it geologically active?,204.2756,64,0.31
+4,What is biodiversity and why does it matter for ecosystems?,174.1062,64,0.37
+5,What is GDP and how is it measured?,160.7486,64,0.4
+6,What is comparative advantage in international trade?,159.8023,64,0.4
+7,How does inflation affect an economy?,161.5905,64,0.4
+8,What is dependency injection and when should you use it?,162.5371,64,0.39
+9,What makes a compelling opening paragraph for a short story?,163.9432,64,0.39
+10,How does a CPU execute machine instructions?,162.6288,64,0.39
+11,How do ocean currents affect global climate?,166.1381,64,0.39
+12,What is the travelling salesman problem and why is it hard?,166.4866,64,0.38

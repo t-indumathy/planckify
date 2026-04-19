@@ -1,4 +1,8 @@
-# Gemma 4 E2B — Locust Benchmark Report
+# Planckify — Locust Benchmark Report
+
+---
+
+## Gemma 4 E2B (LiteRT-LM int4 vs ONNX q4)
 
 **Date:** 2026-04-12  
 **Model:** Gemma 4 E2B Instruction-tuned  
@@ -126,6 +130,56 @@ Both flavours run entirely on **CPU** — no GPU is used in either case.
 | `results/onnx_detailed.csv` | Per-request: seq, prompt, gen_time, tokens, tok/s |
 | `results/onnx_stats.csv` | Locust aggregate stats for ONNX |
 | `results/comparison.json` | Machine-readable summary of all metrics |
+| `results/gemma3_4b_onnx_detailed.csv` | Per-request: seq, prompt, gen_time, tokens, tok/s (Gemma 3 4B int8) |
 | `locustfile_cpu.py` | LiteRT-LM Locust test (1 user, cancel_process() token cap) |
 | `locustfile_onnx.py` | ONNX Runtime Locust test (1 user, max_new_tokens=64) |
+| `locustfile_gemma3_4b_onnx.py` | Gemma 3 4B ONNX int8 Locust test (1 user, max_new_tokens=64) |
 | `prompts.py` | 100 shared prompts across 16 topic categories |
+
+---
+
+## Gemma 3 4B IT — ONNX Runtime int8 (partial run)
+
+**Date:** 2026-04-19  
+**Model:** `onnx-community/gemma-3-4b-it-ONNX` — quantized (int8) flavour  
+**Files:** `embed_tokens_quantized.onnx` + `decoder_model_merged_quantized.onnx`  
+**Prompts:** 10 / 100 completed before early stop  
+**Token cap:** 64 tokens per response (`max_new_tokens=64`)  
+**Concurrency:** 1 virtual user, sequential requests  
+**Environment:** macOS (Apple Silicon), Python 3.14, `.venv` native (no WSL)
+
+> **Note:** Run stopped early after 10 requests. All 10 hit the 64-token cap — decode speed is stable with low variance.
+
+### Per-Request Decode Metrics
+
+| Metric | Gemma 3 4B ONNX int8 (macOS) |
+|---|--:|
+| Completed requests | 10 / 100 (partial) |
+| Tokens generated | 64 (all hit cap) |
+| Avg decode time | 164.6 s |
+| Min decode time | 147.3 s |
+| Max decode time | 204.3 s |
+| Avg decode speed | **0.39 tok/s** |
+| Min decode speed | 0.31 tok/s |
+| Max decode speed | 0.43 tok/s |
+
+> Decode time = autoregressive loop only (after first token). Does not include prefill / TTFT.
+
+### vs Gemma 4 E2B ONNX q4 (WSL2 x86-64 baseline)
+
+| Metric | Gemma 4 E2B ONNX q4 (WSL2) | Gemma 3 4B ONNX int8 (macOS) |
+|---|--:|--:|
+| Avg decode speed | 2.67 tok/s | **0.39 tok/s** |
+| Avg decode time | 24.70 s | **164.6 s** |
+| Tokens generated | ~63.4 | 64 |
+
+> **Important caveat:** These runs are on different hardware (WSL2 x86-64 vs macOS Apple Silicon) and different model sizes (2B vs 4B) and quantization schemes (int4 vs int8). The comparison is informational only — not apples-to-apples.
+
+### Expected on Linux x86-64 OCP (projected)
+
+| CPU type | Projected decode speed |
+|---|---|
+| Intel Xeon w/ AVX-512 VNNI | ~1.0–2.0 tok/s |
+| AMD EPYC w/ AVX2 | ~0.8–1.5 tok/s |
+
+> Projection based on AVX-512 VNNI int8 GEMM throughput vs observed macOS baseline. ORT threading tuning (`OMP_NUM_THREADS`, `ORT_NUM_INTRA_THREADS`) can improve this further.

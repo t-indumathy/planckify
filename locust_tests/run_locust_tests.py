@@ -59,7 +59,8 @@ REPO_ROOT  = TESTS_DIR.parent
 RESULTS_DIR = TESTS_DIR / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
-# Windows .venv — used for ONNX (native)
+# .venv — native macOS/Linux path (also Windows Scripts path for ONNX)
+_VENV_PYTHON     = REPO_ROOT / ".venv" / "bin" / "python"
 _WIN_VENV_PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
 
 # WSL .wsl-venv — used for CPU/LiteRT-LM (Linux-only package)
@@ -129,6 +130,73 @@ def _run_locust_onnx(locustfile: str, csv_prefix: str, iterations: int) -> int:
     _print_run_header("ONNX", locustfile, csv_prefix, iterations, _WSL_VENV_PYTHON, via_wsl=True)
     result = subprocess.run(cmd)
     return result.returncode
+
+
+def _run_locust_gemma3_onnx(locustfile: str, csv_prefix: str, iterations: int) -> int:
+    """Run Gemma 3 4B IT ONNX int8 locust test natively via .venv on macOS/Linux."""
+    if not _is_windows():
+        python = str(_VENV_PYTHON)
+        if not _VENV_PYTHON.exists():
+            print(
+                f"[ERROR] .venv not found at {_VENV_PYTHON}\n"
+                "        Create it and install deps:\n"
+                "          python3 -m venv .venv\n"
+                "          .venv/bin/pip install -r experiments/gemma3_4b_onnx/requirements.txt\n"
+                "          .venv/bin/pip install -r locust_tests/requirements.txt"
+            )
+            return 1
+        locustfile_path = str(TESTS_DIR / locustfile)
+        csv_path = str(RESULTS_DIR / csv_prefix)
+        cmd = [
+            python, "-m", "locust",
+            "-f", locustfile_path,
+            "--headless", "--users", "1", "--spawn-rate", "1",
+            "--run-time", "8h",
+            "--csv", csv_path,
+            "--loglevel", "WARNING",
+            "--host", "",
+        ]
+        env = {**__import__('os').environ, "LOCUST_TARGET_REQUESTS": str(iterations)}
+        _print_run_header("Gemma3-ONNX-int8", locustfile, csv_prefix, iterations, python, via_wsl=False)
+        result = subprocess.run(cmd, env=env)
+        return result.returncode
+    # Windows: run via WSL
+    return _run_locust_onnx(locustfile, csv_prefix, iterations)
+
+
+def _run_locust_gemma3(locustfile: str, csv_prefix: str, iterations: int) -> int:
+    """Run Gemma 3 4B IT LiteRT-LM locust test.
+
+    On macOS/Linux runs directly with .venv/bin/python.
+    On Windows falls back to WSL + .wsl-venv (litert-lm has no Windows wheel).
+    """
+    if not _is_windows():
+        python = str(_VENV_PYTHON)
+        if not _VENV_PYTHON.exists():
+            print(
+                f"[ERROR] .venv not found at {_VENV_PYTHON}\n"
+                "        Create it and install deps:\n"
+                "          python3 -m venv .venv\n"
+                "          .venv/bin/pip install -r experiments/gemma3_4b_litertlm/requirements.txt\n"
+                "          .venv/bin/pip install -r locust_tests/requirements.txt"
+            )
+            return 1
+        locustfile_path = str(TESTS_DIR / locustfile)
+        csv_path = str(RESULTS_DIR / csv_prefix)
+        cmd = [
+            python, "-m", "locust",
+            "-f", locustfile_path,
+            "--headless", "--users", "1", "--spawn-rate", "1",
+            "--run-time", "8h",
+            "--csv", csv_path,
+            "--loglevel", "WARNING",
+            "--host", "",
+        ]
+        env = {**__import__('os').environ, "LOCUST_TARGET_REQUESTS": str(iterations)}
+        _print_run_header("Gemma3", locustfile, csv_prefix, iterations, python, via_wsl=False)
+        result = subprocess.run(cmd, env=env)
+        return result.returncode
+    return _run_locust_cpu(locustfile, csv_prefix, iterations)
 
 
 def _run_locust_cpu(locustfile: str, csv_prefix: str, iterations: int) -> int:
@@ -278,14 +346,15 @@ def _print_detailed_stats(label: str, rows: list[dict], has_ttft: bool) -> None:
 # Comparison JSON export
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _safe_float(d: dict, key: str) -> float | None:
+    try:
+        return float(d[key])
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
 def _export_comparison(cpu_stats: dict, onnx_stats: dict,
                         cpu_rows: list[dict], onnx_rows: list[dict]) -> Path:
-    def _safe_float(d: dict, key: str) -> float | None:
-        try:
-            return float(d[key])
-        except (KeyError, ValueError, TypeError):
-            return None
-
     def _summary(stats: dict, rows: list[dict], ttft: bool) -> dict:
         gen_times = _floats(rows, "gen_time_s")
         tps_vals  = _floats(rows, "decode_speed_tok_s")
@@ -336,7 +405,7 @@ def main() -> None:
         help="Number of inference requests per flavour (default: 100)"
     )
     parser.add_argument(
-        "--flavour", choices=["cpu", "onnx", "both"], default="both",
+        "--flavour", choices=["cpu", "onnx", "gemma3", "gemma3_onnx", "both"], default="both",
         help="Which flavour(s) to test (default: both)"
     )
     parser.add_argument(
@@ -359,25 +428,45 @@ def main() -> None:
             if rc != 0:
                 print(f"[WARN] ONNX Locust test exited with code {rc}")
 
+        # Gemma 3 4B IT LiteRT-LM: Linux-only — must run via WSL
+        if args.flavour == "gemma3":
+            rc = _run_locust_gemma3("locustfile_gemma3_4b.py", "gemma3_4b", args.iterations)
+            if rc != 0:
+                print(f"[WARN] Gemma 3 4B Locust test exited with code {rc}")
+
+        # Gemma 3 4B IT ONNX int8: native macOS/Linux via .venv
+        if args.flavour == "gemma3_onnx":
+            rc = _run_locust_gemma3_onnx("locustfile_gemma3_4b_onnx.py", "gemma3_4b_onnx", args.iterations)
+            if rc != 0:
+                print(f"[WARN] Gemma 3 4B ONNX Locust test exited with code {rc}")
+
     # ── read results ──────────────────────────────────────────────────────────
-    cpu_stats  = _read_locust_stats("litertlm")
-    onnx_stats = _read_locust_stats("onnx")
-    cpu_rows   = _read_detailed(RESULTS_DIR / "litertlm_detailed.csv")
-    onnx_rows  = _read_detailed(RESULTS_DIR / "onnx_detailed.csv")
+    cpu_stats     = _read_locust_stats("litertlm")
+    onnx_stats    = _read_locust_stats("onnx")
+    gemma3_stats  = _read_locust_stats("gemma3_4b")
+    gemma3_onnx_stats = _read_locust_stats("gemma3_4b_onnx")
+    cpu_rows      = _read_detailed(RESULTS_DIR / "litertlm_detailed.csv")
+    onnx_rows     = _read_detailed(RESULTS_DIR / "onnx_detailed.csv")
+    gemma3_rows   = _read_detailed(RESULTS_DIR / "gemma3_4b_detailed.csv")
+    gemma3_onnx_rows = _read_detailed(RESULTS_DIR / "gemma3_4b_onnx_detailed.csv")
 
     # ── print comparison ──────────────────────────────────────────────────────
     sep = "=" * 70
     print(f"\n{sep}")
-    print("  LOAD TEST COMPARISON  —  Gemma 4 E2B  (100 random prompts)")
+    print("  LOAD TEST COMPARISON  —  Gemma inference flavours  (random prompts)")
     print(sep)
 
     if args.flavour in ("cpu", "both"):
-        _print_locust_stats("CPU \u2014 LiteRT-LM (XNNPACK) via WSL", cpu_stats)
-        _print_detailed_stats("CPU \u2014 LiteRT-LM (XNNPACK) via WSL", cpu_rows, has_ttft=True)
+        _print_locust_stats("CPU \u2014 Gemma 4 E2B LiteRT-LM (XNNPACK) via WSL", cpu_stats)
+        _print_detailed_stats("CPU \u2014 Gemma 4 E2B LiteRT-LM (XNNPACK) via WSL", cpu_rows, has_ttft=True)
 
     if args.flavour in ("onnx", "both"):
-        _print_locust_stats("ONNX \u2014 raw ONNX Runtime via WSL", onnx_stats)
-        _print_detailed_stats("ONNX \u2014 raw ONNX Runtime via WSL", onnx_rows, has_ttft=False)
+        _print_locust_stats("ONNX \u2014 Gemma 4 E2B raw ONNX Runtime via WSL", onnx_stats)
+        _print_detailed_stats("ONNX \u2014 Gemma 4 E2B raw ONNX Runtime via WSL", onnx_rows, has_ttft=False)
+
+    if args.flavour == "gemma3":
+        _print_locust_stats("Gemma 3 4B IT \u2014 LiteRT-LM (XNNPACK) via WSL", gemma3_stats)
+        _print_detailed_stats("Gemma 3 4B IT \u2014 LiteRT-LM (XNNPACK) via WSL", gemma3_rows, has_ttft=True)
 
     # ── delta summary ─────────────────────────────────────────────────────────
     if args.flavour == "both" and cpu_rows and onnx_rows:
@@ -409,6 +498,41 @@ def main() -> None:
     if cpu_rows or onnx_rows:
         out = _export_comparison(cpu_stats, onnx_stats, cpu_rows, onnx_rows)
         print(f"\n  Full comparison written to: {out}")
+
+    if gemma3_rows:
+        gemma3_out = RESULTS_DIR / "gemma3_4b_comparison.json"
+        gen_times = _floats(gemma3_rows, "gen_time_s")
+        tps_vals  = _floats(gemma3_rows, "decode_speed_tok_s")
+        tokens    = _floats(gemma3_rows, "approx_tokens")
+        ttft_vals = _floats(gemma3_rows, "ttft_s")
+        gemma3_summary = {
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "gemma3_4b_litertlm": {
+                "locust_requests":  _safe_float(gemma3_stats, "Request Count") if gemma3_stats else None,
+                "locust_failures":  _safe_float(gemma3_stats, "Failure Count") if gemma3_stats else None,
+                "locust_avg_ms":    _safe_float(gemma3_stats, "Average Response Time") if gemma3_stats else None,
+                "locust_p50_ms":    _safe_float(gemma3_stats, "50%") if gemma3_stats else None,
+                "locust_p95_ms":    _safe_float(gemma3_stats, "95%") if gemma3_stats else None,
+                "locust_p99_ms":    _safe_float(gemma3_stats, "99%") if gemma3_stats else None,
+                "locust_rps":       _safe_float(gemma3_stats, "Requests/s") if gemma3_stats else None,
+                "gen_time_avg_s":   statistics.mean(gen_times) if gen_times else None,
+                "gen_time_p50_s":   statistics.median(gen_times) if gen_times else None,
+                "gen_time_p95_s":   sorted(gen_times)[int(len(gen_times) * 0.95)] if gen_times else None,
+                "decode_speed_avg": statistics.mean(tps_vals) if tps_vals else None,
+                "decode_speed_p50": statistics.median(tps_vals) if tps_vals else None,
+                "tokens_avg":       statistics.mean(tokens) if tokens else None,
+                "ttft_avg_s":       statistics.mean(ttft_vals) if ttft_vals else None,
+                "ttft_p50_s":       statistics.median(ttft_vals) if ttft_vals else None,
+                "ttft_p95_s":       sorted(ttft_vals)[int(len(ttft_vals) * 0.95)] if ttft_vals else None,
+            },
+        }
+        with open(gemma3_out, "w", encoding="utf-8") as fh:
+            json.dump(gemma3_summary, fh, indent=2)
+        print(f"\n  Gemma 3 4B comparison written to: {gemma3_out}")
+
+    if args.flavour == "gemma3_onnx":
+        _print_locust_stats("Gemma 3 4B IT \u2014 ONNX int8 (raw onnxruntime)", gemma3_onnx_stats)
+        _print_detailed_stats("Gemma 3 4B IT \u2014 ONNX int8 (raw onnxruntime)", gemma3_onnx_rows, has_ttft=False)
 
     print(f"\n  All result files: {RESULTS_DIR}/")
     print(f"{sep}\n")

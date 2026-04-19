@@ -23,6 +23,7 @@ env/
 # Environment
 .env
 .env.local
+*.profraw
 
 
 
