@@ -54,7 +54,52 @@ jobs:
           ruff check .
 
   # ------------------------------------------------------------------ #
-  # Job 2: ONNX Runtime (raw) — Gemma 4 E2B CPU                         #
+  # Job 2: LiteRT-LM — Gemma 3 4B IT CPU (int8)                         #
+  # Full end-to-end: download model + run inference + benchmark          #
+  # ------------------------------------------------------------------ #
+  litert-lm-gemma3-cpu:
+    name: LiteRT-LM — Gemma 3 4B IT CPU (int8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    defaults:
+      run:
+        working-directory: experiments/gemma3_4b_litertlm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: experiments/gemma3_4b_litertlm/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download Gemma 3 4B IT int8 model
+        run: python download_model.py
+
+      - name: Run CPU inference smoke test
+        run: |
+          python run_inference_cpu.py \
+            --prompt "What is the Planck constant?" \
+            --max-tokens 32
+
+      - name: Run benchmark (5 prompts)
+        run: python benchmark.py --runs 1
+
+      - name: Lint with ruff
+        run: |
+          pip install ruff
+          ruff check .
+
+  # ------------------------------------------------------------------ #
+  # Job 3: ONNX Runtime (raw) — Gemma 4 E2B CPU                         #
   # Smoke test: verify imports + deps without model download             #
   # Full E2E gated on HF_TOKEN env var being set                         #
   # ------------------------------------------------------------------ #

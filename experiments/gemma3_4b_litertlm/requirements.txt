@@ -1,0 +1,10 @@
+# LiteRT-LM Python API (nightly) — Google's on-device LLM inference engine
+# Docs: https://ai.google.dev/edge/litert-lm/python
+litert-lm-api-nightly
+
+# HuggingFace Hub for model download
+huggingface-hub>=0.22.0
+
+# Utilities
+numpy>=1.26.0
+tqdm>=4.66.0
