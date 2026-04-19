@@ -6,17 +6,16 @@ All experiments run entirely on **CPU** — no GPU. One virtual user, sequential
 
 ## Run Index
 
-| # | Model | Framework | Quantization | Environment | Date | Requests |
-|---|---|---|---|---|---|---|
-| 1 | Gemma 4 E2B IT | LiteRT-LM (XNNPACK) | int4 | WSL2 x86-64 | 2026-04-12 | 100 |
-| 2 | Gemma 4 E2B IT | ONNX Runtime raw | q4 | WSL2 x86-64 | 2026-04-12 | 100 |
-| 3 | Gemma 3 4B IT | ONNX Runtime raw | int8 | macOS Apple Silicon | 2026-04-19 | 10 (partial) |
+| # | Model | Framework | Quantization | Environment | Requests |
+|---|---|---|---|---|---|
+| 1 | Gemma 4 E2B IT | LiteRT-LM (XNNPACK) | int4 | WSL2 x86-64 | 100 |
+| 2 | Gemma 4 E2B IT | ONNX Runtime raw | q4 | WSL2 x86-64 | 100 |
+| 3 | Gemma 3 4B IT | ONNX Runtime raw | int8 | macOS Apple Silicon | 10 (partial) |
 
 ---
 
 ## Run 1 & 2 — Gemma 4 E2B IT: LiteRT-LM int4 vs ONNX q4
 
-**Date:** 2026-04-12  
 **Model:** `litert-community/gemma-4-E2B-it-litert-lm` / `onnx-community/gemma-4-E2B-it-ONNX`  
 **Prompts:** 100 random prompts across 16 topic categories  
 **Token cap:** 64 tokens per response  
@@ -118,7 +117,6 @@ All experiments run entirely on **CPU** — no GPU. One virtual user, sequential
 
 ## Run 3 — Gemma 3 4B IT: ONNX Runtime int8 (partial run)
 
-**Date:** 2026-04-19  
 **Model:** `onnx-community/gemma-3-4b-it-ONNX` — quantized (int8) flavour  
 **Files:** `embed_tokens_quantized.onnx` + `decoder_model_merged_quantized.onnx`  
 **Prompts:** 10 / 100 completed before early stop  
