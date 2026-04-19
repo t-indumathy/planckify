@@ -1,8 +1,8 @@
 """Download Gemma 3 4B IT LiteRT-LM model from HuggingFace.
 
-Model: litert-community/gemma-3-4b-it-litert-lm
-File:  gemma-3-4b-it-int8.litertlm (int8 quantized)
-Docs:  https://huggingface.co/litert-community/gemma-3-4b-it-litert-lm
+Model: litert-community/Gemma3-4B-IT
+File:  gemma3-4b-it-int8.litertlm (int8 quantized)
+Docs:  https://huggingface.co/litert-community/Gemma3-4B-IT
 """
 
 import os
@@ -10,8 +10,8 @@ import argparse
 from pathlib import Path
 from huggingface_hub import hf_hub_download, login
 
-REPO_ID = "litert-community/gemma-3-4b-it-litert-lm"
-MODEL_FILENAME = "gemma-3-4b-it-int8.litertlm"
+REPO_ID = "litert-community/Gemma3-4B-IT"
+MODEL_FILENAME = "gemma3-4b-it-int8.litertlm"
 DEFAULT_MODEL_DIR = Path("./models")
 
 

@@ -7,7 +7,7 @@ Docs: https://ai.google.dev/edge/litert-lm/python
 
 Usage:
     python benchmark.py
-    python benchmark.py --model-path ./models/gemma-3-4b-it-int8.litertlm
+    python benchmark.py --model-path ./models/gemma3-4b-it-int8.litertlm
     python benchmark.py --runs 3
 """
 import argparse
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import litert_lm
 
-DEFAULT_MODEL_PATH = Path("./models/gemma-3-4b-it-int8.litertlm")
+DEFAULT_MODEL_PATH = Path("./models/gemma3-4b-it-int8.litertlm")
 
 BENCHMARK_PROMPTS = [
     "What is quantization in machine learning?",

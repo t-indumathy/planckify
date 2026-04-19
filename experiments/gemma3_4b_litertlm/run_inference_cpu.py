@@ -4,7 +4,7 @@ Uses the official LiteRT-LM Python API:
   Engine -> create_conversation() -> send_message / send_message_async
 
 Docs: https://ai.google.dev/edge/litert-lm/python
-Model: litert-community/gemma-3-4b-it-litert-lm
+Model: litert-community/Gemma3-4B-IT
 
 Usage:
     python run_inference_cpu.py
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import litert_lm
 
-DEFAULT_MODEL_PATH = Path("./models/gemma-3-4b-it-int8.litertlm")
+DEFAULT_MODEL_PATH = Path("./models/gemma3-4b-it-int8.litertlm")
 DEFAULT_MAX_TOKENS = 512
 SYSTEM_PROMPT = "You are a helpful AI assistant running on-device via LiteRT-LM."
 

@@ -114,7 +114,7 @@ export HF_TOKEN=your_token
 python download_model.py
 ```
 
-Pulls `litert-community/gemma-3-4b-it-litert-lm` (~int8).
+Pulls `litert-community/Gemma3-4B-IT` (~int8).
 
 ### 3. Run inference
 
@@ -226,7 +226,7 @@ python benchmark.py --runs 1
 
 ## References
 
-- [gemma-3-4b-it-litert-lm on HuggingFace](https://huggingface.co/litert-community/gemma-3-4b-it-litert-lm)
+- [gemma-3-4b-it-litert-lm on HuggingFace](https://huggingface.co/litert-community/Gemma3-4B-IT)
 - [LiteRT-LM Python API](https://ai.google.dev/edge/litert-lm/python)
 - [LiteRT-LM Overview](https://ai.google.dev/edge/litert-lm/overview)
 - [gemma-4-E2B-it-litert-lm on HuggingFace](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)
