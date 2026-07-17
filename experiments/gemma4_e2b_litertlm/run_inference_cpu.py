@@ -40,11 +40,13 @@ def run_inference(model_path: Path, prompt: str, max_tokens: int = DEFAULT_MAX_T
     print("-" * 60)
 
     load_start = time.perf_counter()
+    cache_dir = Path("/tmp/planckify-litert-cache")
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     with litert_lm.Engine(
         str(model_path),
         backend=litert_lm.Backend.CPU,
-        cache_dir="/tmp/planckify-litert-cache",
+        cache_dir=str(cache_dir),
     ) as engine:
         load_time = time.perf_counter() - load_start
 

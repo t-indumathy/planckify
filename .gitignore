@@ -1,8 +1,8 @@
 # Model files
-*.litertlm
 *.task
 cache/
-models/
+models/*onnx
+experiments/gemma3_4b_onnx/models
 
 # Python
 __pycache__/
